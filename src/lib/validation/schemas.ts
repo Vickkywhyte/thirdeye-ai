@@ -62,6 +62,36 @@ export const investigationSchema = z.object({
 })
 export type InvestigationInput = z.infer<typeof investigationSchema>
 
+export const createInvestigationSchema = z.object({
+  entity_name: z.string().min(1, 'Entity name is required'),
+  entity_type: z.enum(['individual', 'company', 'trust', 'partnership', 'other']),
+  jurisdiction: z.string().optional(),
+  registration_number: z.string().optional(),
+})
+export type CreateInvestigationInput = z.infer<typeof createInvestigationSchema>
+
+export const updateInvestigationSchema = z.object({
+  status: z
+    .enum(['active', 'pending_review', 'completed', 'escalated', 'archived'])
+    .optional(),
+  assigned_to: z.string().uuid('Invalid user ID').nullable().optional(),
+  summary: z.string().optional(),
+  due_date: z.string().optional(),
+})
+export type UpdateInvestigationInput = z.infer<typeof updateInvestigationSchema>
+
+export const timelineEventSchema = z.object({
+  event_type: z.string().min(1, 'Event type is required'),
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional(),
+})
+export type TimelineEventInput = z.infer<typeof timelineEventSchema>
+
+export const analystNoteSchema = z.object({
+  content: z.string().min(1, 'Note content is required'),
+})
+export type AnalystNoteInput = z.infer<typeof analystNoteSchema>
+
 export const screeningSchema = z.object({
   investigation_id: z.string().uuid('Invalid investigation ID'),
   types: z
