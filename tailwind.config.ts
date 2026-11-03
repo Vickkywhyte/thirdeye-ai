@@ -31,6 +31,8 @@ const config: Config = {
           low: '#22C55E',
         },
         accent: {
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
           blue: '#3B82F6',
           teal: '#14B8A6',
         },
