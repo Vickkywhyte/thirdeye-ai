@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
 import { RiskScoreRing } from '@/components/investigation/risk-score-ring'
+import { ScreeningResults } from '@/components/investigation/screening-results'
 import { formatDateTime } from '@/lib/utils/formatting'
 
 type Investigation = {
@@ -204,31 +205,7 @@ export default function InvestigationWorkspacePage() {
         </TabsContent>
 
         <TabsContent value="screening" className="mt-6">
-          {investigation.screening_results.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {investigation.screening_results.map((r) => (
-                <Card key={r.id}>
-                  <CardHeader>
-                    <CardTitle className="capitalize text-base">
-                      {r.type.replace('_', ' ')}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Status</span>
-                      <Badge variant="secondary">{r.status}</Badge>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Hits</span>
-                      <span>{r.hit_count}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <EmptyState variant="screening" />
-          )}
+          <ScreeningResults investigationId={investigation.id} />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-6">

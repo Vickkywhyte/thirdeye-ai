@@ -67,7 +67,18 @@ export default function NewInvestigationPage() {
     }
 
     const json = await res.json()
-    router.push(`/investigations/${json.data.id}`)
+    const investigationId = json.data.id
+
+    fetch('/api/screening', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        investigation_id: investigationId,
+        types: ['sanctions', 'pep', 'adverse_media', 'registry'],
+      }),
+    }).catch(() => {})
+
+    router.push(`/investigations/${investigationId}`)
   }
 
   return (
