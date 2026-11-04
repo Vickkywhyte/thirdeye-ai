@@ -22,13 +22,23 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const { data: results, error } = await supabase
       .from('screening_results')
-      .select('*, screening_hits(*)')
+      .select('*')
       .eq('investigation_id', investigationId)
       .order('created_at', { ascending: true })
 
     if (error) {
       return apiError('Failed to fetch screening status', 500)
     }
+
+    const resultsWithHits = await Promise.all(
+      results.map(async (r) => {
+        const { data: hits } = await supabase
+          .from('screening_hits')
+          .select('*')
+          .eq('result_id', r.id)
+        return { ...r, screening_hits: hits ?? [] }
+      })
+    )
 
     const allCompleted = results.every(
       (r) => r.status === 'completed' || r.status === 'failed'
@@ -40,7 +50,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return apiSuccess({
       investigation_id: investigationId,
       status: anyRunning ? 'running' : allCompleted ? 'completed' : 'pending',
-      results,
+      results: resultsWithHits,
     })
   } catch (error) {
     return handleApiError(error)

@@ -8,14 +8,12 @@ import {
   FileText,
   GitBranch,
   MessageSquare,
-  Search,
   ShieldCheck,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -24,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
 import { RiskScoreRing } from '@/components/investigation/risk-score-ring'
 import { ScreeningResults } from '@/components/investigation/screening-results'
+import { AiAnalysisCard } from '@/components/investigation/ai-analysis-card'
 import { formatDateTime } from '@/lib/utils/formatting'
 
 type Investigation = {
@@ -165,9 +164,16 @@ export default function InvestigationWorkspacePage() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Entity Summary</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-base">Entity Summary</CardTitle>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Name</span>
+                  <span className="font-medium">{entity.name}</span>
+                </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Type</span>
                   <span className="capitalize">{entity.type}</span>
@@ -177,30 +183,24 @@ export default function InvestigationWorkspacePage() {
                   <span>{entity.jurisdiction ?? '—'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Registration</span>
+                  <span className="text-muted-foreground">Registration No.</span>
                   <span>{entity.registration_number ?? '—'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Risk Score</span>
                   <span>{investigation.risk_score ?? 'Not scored'}</span>
                 </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Created</span>
+                  <span>{formatDateTime(investigation.created_at)}</span>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">AI Analysis</CardTitle>
-                <CardDescription>
-                  Automated risk assessment summary
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {investigation.summary ??
-                    'AI analysis will appear here after screening is complete.'}
-                </p>
-              </CardContent>
-            </Card>
+            <AiAnalysisCard
+              investigationId={investigation.id}
+              hasScreeningResults={investigation.screening_results.length > 0}
+            />
           </div>
         </TabsContent>
 
