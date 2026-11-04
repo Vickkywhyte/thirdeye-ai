@@ -10,6 +10,7 @@ import {
   apiUnauthorized,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
+import { validateUUID } from '@/lib/security/input-validator'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -20,6 +21,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!hasPermission(user.role, 'reports:read')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const supabase = await createClient()
 
     const { data: report, error } = await supabase
@@ -59,6 +61,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!hasPermission(user.role, 'reports:update')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const body = await request.json()
     const { title, status } = body as { title?: string; status?: string }
 
@@ -105,6 +108,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     if (!hasPermission(user.role, 'reports:delete')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const admin = createAdminClient()
 
     const { error } = await admin

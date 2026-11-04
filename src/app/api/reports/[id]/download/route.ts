@@ -9,6 +9,7 @@ import {
   apiUnauthorized,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
+import { validateUUID } from '@/lib/security/input-validator'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -19,6 +20,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!hasPermission(user.role, 'reports:read')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const supabase = await createClient()
 
     const { data: report } = await supabase

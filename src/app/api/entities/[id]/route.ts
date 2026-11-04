@@ -11,6 +11,7 @@ import {
   apiError,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
+import { validateUUID } from '@/lib/security/input-validator'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -21,6 +22,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (!hasPermission(user.role, 'entities:read')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('entities')
@@ -44,6 +46,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!hasPermission(user.role, 'entities:update')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const body = await request.json()
     const parsed = entitySchema.partial().safeParse(body)
     if (!parsed.success) {
@@ -74,6 +77,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     if (!hasPermission(user.role, 'entities:delete')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const supabase = await createClient()
     const { error } = await supabase
       .from('entities')

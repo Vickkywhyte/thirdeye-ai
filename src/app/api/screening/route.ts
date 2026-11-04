@@ -10,10 +10,18 @@ import {
   apiUnauthorized,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
+import { screeningRateLimiter } from '@/lib/security/rate-limiter'
+import { logAuditEvent, AUDIT_ACTIONS } from '@/lib/security/audit'
 import type { ScreeningTypeValue } from '@/lib/screening/types'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+    const { allowed, remaining } = screeningRateLimiter(`${ip}:screening`)
+    if (!allowed) {
+      return apiError('Too many requests. Please try again later.', 429)
+    }
+
     const user = await getUser()
     if (!user) return apiUnauthorized()
     if (!hasPermission(user.role, 'screening:run')) return apiForbidden()
@@ -73,6 +81,15 @@ export async function POST(request: NextRequest) {
     })
 
     screeningPromise.catch(() => {})
+
+    await logAuditEvent(supabase, {
+      userId: user.id,
+      orgId: user.orgId,
+      action: AUDIT_ACTIONS.SCREENING_TRIGGERED,
+      resourceType: 'investigation',
+      resourceId: investigation_id,
+      metadata: { types: screeningTypes },
+    })
 
     return NextResponse.json(
       { message: 'Screening started', investigation_id, types: screeningTypes },

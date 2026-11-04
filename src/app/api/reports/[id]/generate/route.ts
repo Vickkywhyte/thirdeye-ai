@@ -10,6 +10,8 @@ import {
   apiUnauthorized,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
+import { validateUUID } from '@/lib/security/input-validator'
+import { logAuditEvent, AUDIT_ACTIONS } from '@/lib/security/audit'
 import type { ReportTemplate, Json } from '@/types/database'
 
 type RouteParams = { params: Promise<{ id: string }> }
@@ -21,6 +23,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     if (!hasPermission(user.role, 'reports:create')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const admin = createAdminClient()
 
     const { data: report, error: reportErr } = await admin
@@ -93,6 +96,15 @@ export async function POST(_request: Request, { params }: RouteParams) {
           } as unknown as Json,
         })
         .eq('id', id)
+
+      await logAuditEvent(admin as never, {
+        userId: user.id,
+        orgId: user.orgId,
+        action: AUDIT_ACTIONS.REPORT_GENERATED,
+        resourceType: 'report',
+        resourceId: id,
+        metadata: { investigationId: report.investigation_id },
+      })
 
       return apiSuccess({
         url: signedUrl?.signedUrl ?? null,

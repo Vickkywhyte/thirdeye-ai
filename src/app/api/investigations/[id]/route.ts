@@ -11,6 +11,8 @@ import {
   apiError,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
+import { validateUUID } from '@/lib/security/input-validator'
+import { logAuditEvent, AUDIT_ACTIONS } from '@/lib/security/audit'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -21,6 +23,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (!hasPermission(user.role, 'investigations:read')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const supabase = await createClient()
 
     const { data, error } = await supabase
@@ -48,6 +51,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const body = await request.json()
     const parsed = updateInvestigationSchema.safeParse(body)
     if (!parsed.success) {
@@ -89,6 +93,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const supabase = await createClient()
 
     const { error } = await supabase
@@ -98,6 +103,14 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       .eq('org_id', user.orgId)
 
     if (error) return apiError(error.message, 500, 'DB_ERROR')
+
+    await logAuditEvent(supabase as never, {
+      userId: user.id,
+      orgId: user.orgId,
+      action: AUDIT_ACTIONS.INVESTIGATION_DELETED,
+      resourceType: 'investigation',
+      resourceId: id,
+    })
 
     return apiSuccess({ deleted: true })
   } catch (error) {

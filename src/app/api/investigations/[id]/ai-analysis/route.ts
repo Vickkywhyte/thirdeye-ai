@@ -11,6 +11,8 @@ import {
   apiUnauthorized,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
+import { validateUUID } from '@/lib/security/input-validator'
+import { aiAnalysisRateLimiter } from '@/lib/security/rate-limiter'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -21,6 +23,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!hasPermission(user.role, 'investigations:read')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const supabase = await createClient()
 
     const { data: investigation, error } = await supabase
@@ -58,13 +61,20 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 }
 
-export async function POST(_request: Request, { params }: RouteParams) {
+export async function POST(request: Request, { params }: RouteParams) {
   try {
+    const ip = (request.headers.get('x-forwarded-for') ?? 'unknown')
+    const { allowed } = aiAnalysisRateLimiter(`${ip}:ai-analysis`)
+    if (!allowed) {
+      return apiError('Too many requests. Please try again later.', 429)
+    }
+
     const user = await getUser()
     if (!user) return apiUnauthorized()
     if (!hasPermission(user.role, 'screening:run')) return apiForbidden()
 
     const { id } = await params
+    validateUUID(id)
     const supabase = await createClient()
     const admin = createAdminClient()
 

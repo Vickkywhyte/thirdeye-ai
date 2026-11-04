@@ -11,6 +11,7 @@ import {
   apiError,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
+import { logAuditEvent, AUDIT_ACTIONS } from '@/lib/security/audit'
 
 export async function GET(request: NextRequest) {
   try {
@@ -108,6 +109,15 @@ export async function POST(request: NextRequest) {
       title: 'Investigation created',
       description: `Investigation opened for ${entity.name}`,
       created_by: user.id,
+    })
+
+    await logAuditEvent(supabase as never, {
+      userId: user.id,
+      orgId: user.orgId,
+      action: AUDIT_ACTIONS.INVESTIGATION_CREATED,
+      resourceType: 'investigation',
+      resourceId: investigation.id,
+      metadata: { entityId: entity.id, entityName: entity.name },
     })
 
     return apiCreated({ ...investigation, entity })
