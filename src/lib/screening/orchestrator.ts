@@ -1,4 +1,8 @@
+import { createLogger } from '@/lib/monitoring/logger'
+import { measureAsync } from '@/lib/monitoring/performance'
 import { createAdminClient } from '@/lib/supabase/admin'
+
+const logger = createLogger('screening-orchestrator')
 import { sanctionsProvider } from './sanctions'
 import { pepProvider } from './pep'
 import { adverseMediaProvider } from './adverse-media'
@@ -50,6 +54,7 @@ export async function runScreening(
   types: ScreeningTypeValue[],
   entity: ScreeningEntity
 ): Promise<{ results: ScreeningResult[]; riskScore: number }> {
+  logger.info('Starting screening', { investigationId, types, entityName: entity.name })
   const supabase = createAdminClient()
 
   const screeningPromises = types.map(async (type) => {
@@ -137,8 +142,13 @@ export async function runScreening(
     }
   })
 
-  const results = await Promise.all(screeningPromises)
+  const results = await measureAsync('screening.runAll', () => Promise.all(screeningPromises))
   const riskScore = calculateRiskScore(results)
+  logger.info('Screening completed', {
+    investigationId,
+    riskScore,
+    totalHits: results.reduce((sum, r) => sum + r.hits.length, 0),
+  })
 
   await supabase
     .from('investigations')

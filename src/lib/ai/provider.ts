@@ -1,3 +1,8 @@
+import { createLogger } from '@/lib/monitoring/logger'
+import { measureAsync } from '@/lib/monitoring/performance'
+
+const logger = createLogger('ai-provider')
+
 export interface CompletionOptions {
   maxTokens?: number
   temperature?: number
@@ -112,16 +117,28 @@ export async function generateCompletion(
   prompt: string,
   options: CompletionOptions = {}
 ): Promise<CompletionResult> {
-  try {
-    return await tryOllama(prompt, options)
-  } catch (ollamaError) {
-    if (isConnectionRefused(ollamaError)) {
-      return await tryOpenRouter(prompt, options)
-    }
+  return measureAsync('ai.generateCompletion', async () => {
     try {
-      return await tryOpenRouter(prompt, options)
-    } catch {
-      throw ollamaError
+      logger.info('Attempting Ollama completion')
+      const result = await tryOllama(prompt, options)
+      logger.info('Ollama completion succeeded', { provider: result.provider, tokensUsed: result.tokensUsed })
+      return result
+    } catch (ollamaError) {
+      logger.warn('Ollama failed, falling back to OpenRouter', {
+        error: ollamaError instanceof Error ? ollamaError.message : String(ollamaError),
+      })
+      if (isConnectionRefused(ollamaError)) {
+        const result = await tryOpenRouter(prompt, options)
+        logger.info('OpenRouter completion succeeded', { provider: result.provider, tokensUsed: result.tokensUsed })
+        return result
+      }
+      try {
+        const result = await tryOpenRouter(prompt, options)
+        logger.info('OpenRouter completion succeeded', { provider: result.provider, tokensUsed: result.tokensUsed })
+        return result
+      } catch {
+        throw ollamaError
+      }
     }
-  }
+  })
 }

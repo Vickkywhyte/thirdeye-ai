@@ -14,7 +14,9 @@
     "prepare": "husky",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "docker:build": "docker build -t thirdeye-ai .",
+    "docker:run": "docker compose up --build"
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.1",

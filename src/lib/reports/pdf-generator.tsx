@@ -1,7 +1,11 @@
 import React from 'react'
 import ReactPDF from '@react-pdf/renderer'
+import { createLogger } from '@/lib/monitoring/logger'
+import { measureAsync } from '@/lib/monitoring/performance'
 import type { ReportData, ScreeningResultData } from './types'
 import type { ReportTemplate } from '@/types/database'
+
+const logger = createLogger('pdf-generator')
 
 const { Document, Page, Text, View, StyleSheet, renderToBuffer } = ReactPDF
 
@@ -340,5 +344,8 @@ export async function generatePDF(
   reportData: ReportData,
   template: ReportTemplate
 ): Promise<Buffer> {
-  return renderToBuffer(<ReportDocument data={reportData} template={template} />)
+  logger.info('Generating PDF', { template, entity: reportData.entity.name })
+  return measureAsync('pdf.render', () =>
+    renderToBuffer(<ReportDocument data={reportData} template={template} />)
+  )
 }
