@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams } from 'next/navigation'
 import {
   Building2,
@@ -24,6 +25,17 @@ import { RiskScoreRing } from '@/components/investigation/risk-score-ring'
 import { ScreeningResults } from '@/components/investigation/screening-results'
 import { AiAnalysisCard } from '@/components/investigation/ai-analysis-card'
 import { formatDateTime } from '@/lib/utils/formatting'
+
+const OwnershipGraph = dynamic(
+  () =>
+    import('@/components/graph/ownership-graph').then(
+      (mod) => mod.OwnershipGraph
+    ),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[600px] w-full rounded-lg" />,
+  }
+)
 
 type Investigation = {
   id: string
@@ -217,11 +229,7 @@ export default function InvestigationWorkspacePage() {
         </TabsContent>
 
         <TabsContent value="ownership" className="mt-6">
-          <EmptyState
-            icon={GitBranch}
-            title="No ownership structure"
-            description="Map out the ownership and control structure of this entity."
-          />
+          <OwnershipGraph investigationId={investigation.id} />
         </TabsContent>
 
         <TabsContent value="timeline" className="mt-6">
