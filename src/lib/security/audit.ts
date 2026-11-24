@@ -32,6 +32,9 @@ export const AUDIT_ACTIONS = {
   ESCALATION_RESOLVED: 'escalation.resolved',
   EDD_CREATED: 'edd.created',
   EDD_UPDATED: 'edd.updated',
+  REVIEW_SCHEDULED: 'review.scheduled',
+  REVIEW_COMPLETED: 'review.completed',
+  REVIEW_MARKED_OVERDUE: 'review.marked_overdue',
 } as const
 
 export async function logAuditEvent(

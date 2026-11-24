@@ -185,3 +185,40 @@ export const updateEddSchema = z.object({
   source_id: z.string().uuid('Invalid source ID').nullable().optional(),
 })
 export type UpdateEddInput = z.infer<typeof updateEddSchema>
+
+export const REVIEW_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'overdue',
+] as const
+export const REVIEW_DUE_PRESETS = [30, 90, 365] as const
+
+export const createReviewSchema = z
+  .object({
+    due_date: z.string().datetime('due_date must be an ISO 8601 datetime').optional(),
+    due_in_days: z
+      .number()
+      .int('due_in_days must be an integer')
+      .positive('due_in_days must be positive')
+      .max(3650, 'due_in_days cannot exceed 10 years')
+      .optional(),
+    source_id: z.string().uuid('Invalid source ID').nullable().optional(),
+  })
+  .refine((v) => v.due_date || v.due_in_days, {
+    message: 'Either due_date or due_in_days is required',
+    path: ['due_date'],
+  })
+export type CreateReviewInput = z.infer<typeof createReviewSchema>
+
+export const updateReviewSchema = z
+  .object({
+    status: z.enum(['in_progress', 'completed']).optional(),
+    due_date: z.string().datetime('due_date must be an ISO 8601 datetime').optional(),
+    source_id: z.string().uuid('Invalid source ID').nullable().optional(),
+  })
+  .refine(
+    (v) => v.status !== undefined || v.due_date !== undefined || v.source_id !== undefined,
+    { message: 'Nothing to update', path: ['status'] }
+  )
+export type UpdateReviewInput = z.infer<typeof updateReviewSchema>

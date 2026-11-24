@@ -848,6 +848,74 @@ export type Database = {
           },
         ]
       }
+      reviews: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          due_date: string
+          id: string
+          investigation_id: string
+          org_id: string
+          source_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          investigation_id: string
+          org_id: string
+          source_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          investigation_id?: string
+          org_id?: string
+          source_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_investigation_id_fkey"
+            columns: ["investigation_id"]
+            isOneToOne: false
+            referencedRelation: "investigations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       risk_scoring_rules: {
         Row: {
           created_at: string

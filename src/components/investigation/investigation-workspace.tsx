@@ -40,6 +40,7 @@ import { DocumentsTab } from '@/components/investigation/documents-tab'
 import { EddTab } from '@/components/investigation/edd-tab'
 import { NotesTab } from '@/components/investigation/notes-tab'
 import { RiskOverrideDialog } from '@/components/investigation/risk-override-dialog'
+import { ScheduleReviewDialog } from '@/components/investigation/schedule-review-dialog'
 import { ClientDate } from '@/components/shared/client-date'
 import { hasPermission } from '@/lib/auth/rbac'
 import type { UserRole } from '@/types/database'
@@ -149,6 +150,7 @@ export function InvestigationWorkspace({
   const scoreBreakdown = computeScoreBreakdown(screeningResults)
   const canEscalate = hasPermission(userRole, 'escalations:create')
   const canEditEdd = hasPermission(userRole, 'edd:update')
+  const canScheduleReview = hasPermission(userRole, 'reviews:update')
   const [activeTab, setActiveTab] = useState('overview')
 
   return (
@@ -189,7 +191,10 @@ export function InvestigationWorkspace({
               breakdown={scoreBreakdown.length > 0 ? scoreBreakdown : undefined}
             />
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {canScheduleReview && (
+              <ScheduleReviewDialog investigationId={investigation.id} />
+            )}
             {canEscalate && (
               <CreateEscalationDialog
                 investigationId={investigation.id}

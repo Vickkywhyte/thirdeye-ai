@@ -9,6 +9,7 @@ import {
   Search,
   FileText,
   Flag,
+  CalendarClock,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -45,6 +46,7 @@ const NAV_ITEMS: readonly NavItem[] = [
     icon: Flag,
     gate: (u) => hasPermission(u.role, 'escalations:resolve'),
   },
+  { label: 'Reviews', href: '/reviews', icon: CalendarClock },
   { label: 'Reports', href: '/reports', icon: FileText },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]
