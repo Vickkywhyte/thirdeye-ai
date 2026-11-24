@@ -30,6 +30,8 @@ export const AUDIT_ACTIONS = {
   DECISION_RECORDED: 'decision.recorded',
   ESCALATION_CREATED: 'escalation.created',
   ESCALATION_RESOLVED: 'escalation.resolved',
+  EDD_CREATED: 'edd.created',
+  EDD_UPDATED: 'edd.updated',
 } as const
 
 export async function logAuditEvent(

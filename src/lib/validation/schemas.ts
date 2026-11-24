@@ -162,3 +162,26 @@ export const resolveEscalationSchema = z.object({
     .max(5000, 'Resolution notes are too long'),
 })
 export type ResolveEscalationInput = z.infer<typeof resolveEscalationSchema>
+
+export const EDD_STATUSES = ['draft', 'completed'] as const
+export const EDD_RISK_LEVELS = ['low', 'medium', 'high'] as const
+
+const riskFactorsSchema = z
+  .record(z.string(), z.enum(EDD_RISK_LEVELS))
+  .default({})
+
+export const upsertEddSchema = z.object({
+  status: z.enum(EDD_STATUSES).default('draft'),
+  risk_factors: riskFactorsSchema,
+  notes: z.string().max(10000, 'Notes are too long').nullable().optional(),
+  source_id: z.string().uuid('Invalid source ID').nullable().optional(),
+})
+export type UpsertEddInput = z.infer<typeof upsertEddSchema>
+
+export const updateEddSchema = z.object({
+  status: z.enum(EDD_STATUSES).optional(),
+  risk_factors: riskFactorsSchema.optional(),
+  notes: z.string().max(10000, 'Notes are too long').nullable().optional(),
+  source_id: z.string().uuid('Invalid source ID').nullable().optional(),
+})
+export type UpdateEddInput = z.infer<typeof updateEddSchema>

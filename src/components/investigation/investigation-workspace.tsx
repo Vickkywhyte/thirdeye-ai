@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import {
   Building2,
   ClipboardCheck,
+  ClipboardList,
   Clock,
   FileText,
   GitBranch,
@@ -35,6 +37,7 @@ import {
   type ComplianceManager,
 } from '@/components/investigation/create-escalation-dialog'
 import { DocumentsTab } from '@/components/investigation/documents-tab'
+import { EddTab } from '@/components/investigation/edd-tab'
 import { NotesTab } from '@/components/investigation/notes-tab'
 import { RiskOverrideDialog } from '@/components/investigation/risk-override-dialog'
 import { ClientDate } from '@/components/shared/client-date'
@@ -145,6 +148,8 @@ export function InvestigationWorkspace({
 
   const scoreBreakdown = computeScoreBreakdown(screeningResults)
   const canEscalate = hasPermission(userRole, 'escalations:create')
+  const canEditEdd = hasPermission(userRole, 'edd:update')
+  const [activeTab, setActiveTab] = useState('overview')
 
   return (
     <div className="space-y-6">
@@ -196,7 +201,7 @@ export function InvestigationWorkspace({
         </div>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="overview">
             <Building2 className="mr-1.5 h-4 w-4" />
@@ -205,6 +210,10 @@ export function InvestigationWorkspace({
           <TabsTrigger value="screening">
             <ShieldCheck className="mr-1.5 h-4 w-4" />
             Screening
+          </TabsTrigger>
+          <TabsTrigger value="edd">
+            <ClipboardList className="mr-1.5 h-4 w-4" />
+            EDD
           </TabsTrigger>
           <TabsTrigger value="application">
             <ClipboardCheck className="mr-1.5 h-4 w-4" />
@@ -303,6 +312,14 @@ export function InvestigationWorkspace({
           <ScreeningResults
             investigationId={investigation.id}
             initialResults={screeningResults}
+          />
+        </TabsContent>
+
+        <TabsContent value="edd" className="mt-6">
+          <EddTab
+            investigationId={investigation.id}
+            canEdit={canEditEdd}
+            onJumpToDocuments={() => setActiveTab('documents')}
           />
         </TabsContent>
 
