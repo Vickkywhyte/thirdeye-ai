@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, connection } from 'next/server'
 import { getUser } from '@/lib/auth/session'
 import { hasPermission } from '@/lib/auth/rbac'
 import { createClient } from '@/lib/supabase/server'
@@ -45,6 +45,7 @@ function isHighRiskScreening(description: string | null): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  await connection()
   try {
     const user = await getUser()
     if (!user) return apiUnauthorized()

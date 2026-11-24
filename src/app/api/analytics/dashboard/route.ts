@@ -9,9 +9,10 @@ import {
 } from '@/lib/analytics/queries'
 import { apiSuccess, apiUnauthorized } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
-import { NextRequest } from 'next/server'
+import { NextRequest, connection } from 'next/server'
 
 export async function GET(request: NextRequest) {
+  await connection()
   try {
     const user = await getUser()
     if (!user) return apiUnauthorized()

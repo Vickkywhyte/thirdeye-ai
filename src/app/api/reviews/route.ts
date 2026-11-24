@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, connection } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/auth/session'
 import { hasPermission } from '@/lib/auth/rbac'
@@ -18,6 +18,7 @@ const ALLOWED_STATUSES = new Set([
 ])
 
 export async function GET(request: NextRequest) {
+  await connection()
   try {
     const user = await getUser()
     if (!user) return apiUnauthorized()
