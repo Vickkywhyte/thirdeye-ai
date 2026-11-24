@@ -12,7 +12,10 @@ import {
 import { handleApiError } from '@/lib/api/error-handler'
 import { screeningRateLimiter } from '@/lib/security/rate-limiter'
 import { logAuditEvent, AUDIT_ACTIONS } from '@/lib/security/audit'
-import type { ScreeningTypeValue } from '@/lib/screening/types'
+import {
+  applicableScreeningTypes,
+  type ScreeningTypeValue,
+} from '@/lib/screening/types'
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,22 +58,46 @@ export async function POST(request: NextRequest) {
       return apiError('Entity not found', 404)
     }
 
-    const screeningTypes = types as ScreeningTypeValue[]
+    // An individual subject has no company registry record, so drop the
+    // registry check before any rows are created -- otherwise it would sit
+    // at "pending" forever and the UI would poll indefinitely.
+    const screeningTypes = applicableScreeningTypes(
+      entity.type,
+      types as ScreeningTypeValue[]
+    )
+
+    if (screeningTypes.length === 0) {
+      return apiError(
+        `None of the requested screening types apply to a "${entity.type}" entity`,
+        400,
+        'NO_APPLICABLE_CHECKS'
+      )
+    }
 
     for (const type of screeningTypes) {
-      await supabase.from('screening_results').upsert(
-        {
-          investigation_id,
-          type: type as 'sanctions' | 'pep' | 'adverse_media' | 'registry',
-          status: 'pending' as const,
-          hit_count: 0,
-          raw_data: {},
-          error_message: null,
-          started_at: null,
-          completed_at: null,
-        },
-        { onConflict: 'investigation_id,type' }
-      )
+      const { error: upsertError } = await supabase
+        .from('screening_results')
+        .upsert(
+          {
+            investigation_id,
+            type: type as 'sanctions' | 'pep' | 'adverse_media' | 'registry',
+            status: 'pending' as const,
+            hit_count: 0,
+            raw_data: {},
+            error_message: null,
+            started_at: null,
+            completed_at: null,
+          },
+          { onConflict: 'investigation_id,type' }
+        )
+
+      if (upsertError) {
+        return apiError(
+          `Could not initialise screening row for "${type}": ${upsertError.message}`,
+          500,
+          'DB_ERROR'
+        )
+      }
     }
 
     const screeningPromise = runScreening(investigation_id, screeningTypes, {

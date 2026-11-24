@@ -199,11 +199,13 @@ export const sanctionsProvider: ScreeningProvider = {
   type: SCREENING_TYPES.SANCTIONS,
 
   async screen(entity: ScreeningEntity): Promise<ScreeningResult> {
+    console.log('[sanctions] Starting sanctions screening for:', entity.name)
     const [ofac, eu, un] = await Promise.allSettled([
       fetchOFAC(),
       fetchEU(),
       fetchUN(),
     ])
+    console.log('[sanctions] Fetch results — OFAC:', ofac.status, 'EU:', eu.status, 'UN:', un.status)
 
     const allEntries: SanctionsListEntry[] = [
       ...(ofac.status === 'fulfilled' ? ofac.value : []),
@@ -218,6 +220,7 @@ export const sanctionsProvider: ScreeningProvider = {
     }
 
     const hits = matchAgainstList(entity, allEntries)
+    console.log('[sanctions] Completed — entries:', allEntries.length, 'hits:', hits.length)
 
     return {
       type: SCREENING_TYPES.SANCTIONS,

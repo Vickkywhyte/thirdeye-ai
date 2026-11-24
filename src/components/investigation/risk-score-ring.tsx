@@ -2,6 +2,12 @@
 
 import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 const SIZES = {
   sm: { size: 48, stroke: 4, fontSize: 'text-xs' },
@@ -23,17 +29,24 @@ function getScoreLabel(score: number): string {
   return 'Low'
 }
 
+export interface ScoreBreakdownItem {
+  label: string
+  contribution: number
+  hitCount: number
+}
+
 interface RiskScoreRingProps {
   score: number
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  breakdown?: ScoreBreakdownItem[]
 }
 
-export function RiskScoreRing({
+function RiskRingSvg({
   score,
   size = 'md',
   className,
-}: RiskScoreRingProps) {
+}: Omit<RiskScoreRingProps, 'breakdown'>) {
   const prefersReducedMotion = useReducedMotion()
   const config = SIZES[size]
   const radius = (config.size - config.stroke) / 2
@@ -101,5 +114,47 @@ export function RiskScoreRing({
         }
       `}</style>
     </div>
+  )
+}
+
+export function RiskScoreRing({
+  score,
+  size = 'md',
+  className,
+  breakdown,
+}: RiskScoreRingProps) {
+  if (!breakdown || breakdown.length === 0) {
+    return <RiskRingSvg score={score} size={size} className={className} />
+  }
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="cursor-help">
+            <RiskRingSvg score={score} size={size} className={className} />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="w-56 p-3">
+          <p className="mb-2 text-xs font-semibold text-foreground">Score breakdown</p>
+          <div className="space-y-1">
+            {breakdown.map((item) => (
+              <div key={item.label} className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">{item.label}</span>
+                <span className={item.contribution > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+                  {item.hitCount === 0
+                    ? '+0 (no hits)'
+                    : `+${item.contribution} (${item.hitCount} hit${item.hitCount !== 1 ? 's' : ''})`}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-xs font-semibold">
+            <span>Total</span>
+            <span>{score}/100</span>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

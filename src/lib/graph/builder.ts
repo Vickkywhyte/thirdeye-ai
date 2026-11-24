@@ -128,6 +128,49 @@ export async function buildGraphData(
 
   await resolveLinks(subjectEntity.id, 0)
 
+  // Cross-investigation network: check which non-subject nodes share a name
+  // with entities belonging to other investigations in this org.
+  const nodeNames = Array.from(nodes.values())
+    .filter((n) => !n.isSubject)
+    .map((n) => n.label)
+
+  if (nodeNames.length > 0) {
+    const { data: sameNameEntities } = await supabase
+      .from('entities')
+      .select('id, name')
+      .eq('org_id', orgId)
+      .in('name', nodeNames)
+
+    if (sameNameEntities && sameNameEntities.length > 0) {
+      const entityIds = sameNameEntities.map((e) => e.id)
+      const entityNameById = new Map(sameNameEntities.map((e) => [e.id, e.name]))
+
+      const { data: linkedInvs } = await supabase
+        .from('investigations')
+        .select('id, entity_id')
+        .eq('org_id', orgId)
+        .in('entity_id', entityIds)
+        .neq('id', investigationId)
+
+      const countByName = new Map<string, number>()
+      for (const inv of linkedInvs ?? []) {
+        const name = entityNameById.get(inv.entity_id)
+        if (name) countByName.set(name, (countByName.get(name) ?? 0) + 1)
+      }
+
+      for (const [id, node] of nodes) {
+        const count = countByName.get(node.label) ?? 0
+        if (count > 0) {
+          nodes.set(id, {
+            ...node,
+            isLinkedElsewhere: true,
+            linkedInvestigationCount: count,
+          })
+        }
+      }
+    }
+  }
+
   return {
     graphData: {
       nodes: Array.from(nodes.values()),

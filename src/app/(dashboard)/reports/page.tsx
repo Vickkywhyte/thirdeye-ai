@@ -1,17 +1,32 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { type LegacyColumnDef } from '@tanstack/react-table/legacy'
-import type { RowData } from '@tanstack/react-table'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ReportStatusBadge } from '@/components/reports/report-status-badge'
 import { ReportPreview } from '@/components/reports/report-preview'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Download, Eye, FileText, Plus, Trash2 } from 'lucide-react'
-import { formatDateTime } from '@/lib/utils/formatting'
+import { Download, Eye, FileText, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { ClientDate } from '@/components/shared/client-date'
 
 interface Report {
   id: string
@@ -23,6 +38,11 @@ interface Report {
   created_at: string
 }
 
+interface Investigation {
+  id: string
+  entity_name: string
+}
+
 const TEMPLATE_LABELS: Record<string, string> = {
   standard_dd: 'Full DD',
   enhanced_dd: 'Enhanced DD',
@@ -30,10 +50,43 @@ const TEMPLATE_LABELS: Record<string, string> = {
   periodic_review: 'Adverse Media',
 }
 
+const TEMPLATE_OPTIONS = [
+  { value: 'standard_dd', label: 'Full Due Diligence' },
+  { value: 'enhanced_dd', label: 'Enhanced Due Diligence' },
+  { value: 'sanctions_alert', label: 'Screening Summary' },
+  { value: 'periodic_review', label: 'Periodic Review' },
+]
+
 export default function ReportsPage() {
+  const router = useRouter()
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [preview, setPreview] = useState<Report | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [investigations, setInvestigations] = useState<Investigation[]>([])
+  const [selectedInvestigation, setSelectedInvestigation] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState('standard_dd')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  const fetchInvestigations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/investigations?limit=100')
+      if (res.ok) {
+        const json = await res.json()
+        setInvestigations(
+          (json.data?.investigations ?? []).map(
+            (inv: { id: string; entity?: { name?: string } }) => ({
+              id: inv.id,
+              entity_name: inv.entity?.name ?? 'Unknown entity',
+            })
+          )
+        )
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
 
   const fetchReports = useCallback(async () => {
     try {
@@ -60,6 +113,53 @@ export default function ReportsPage() {
     const interval = setInterval(fetchReports, 3000)
     return () => clearInterval(interval)
   }, [reports, fetchReports])
+
+  async function handleOpenDialog() {
+    setDialogOpen(true)
+    setSelectedInvestigation('')
+    setSelectedTemplate('standard_dd')
+    setCreateError(null)
+    await fetchInvestigations()
+  }
+
+  async function handleCreateReport() {
+    if (!selectedInvestigation) {
+      setCreateError('Please select an investigation.')
+      return
+    }
+    setCreating(true)
+    setCreateError(null)
+    const selectedInv = investigations.find((i) => i.id === selectedInvestigation)
+    const templateLabel = TEMPLATE_LABELS[selectedTemplate] ?? selectedTemplate
+    const title = `${templateLabel} — ${selectedInv?.entity_name ?? 'Unknown'}`
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          investigationId: selectedInvestigation,
+          template: selectedTemplate,
+          title,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setCreateError(json?.error ?? 'Failed to create report')
+        return
+      }
+      const reportId = json.data?.report?.id
+      setDialogOpen(false)
+      if (reportId) {
+        router.push(`/reports/${reportId}`)
+      } else {
+        fetchReports()
+      }
+    } catch {
+      setCreateError('Network error — please try again.')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   async function handleDelete(id: string) {
     const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' })
@@ -91,14 +191,14 @@ export default function ReportsPage() {
       accessorKey: 'title',
       header: 'Title',
       cell: ({ row }) => (
-        <span className="font-medium text-zinc-200">{row.original.title}</span>
+        <span className="font-medium text-foreground">{row.original.title}</span>
       ),
     },
     {
       accessorKey: 'template',
       header: 'Template',
       cell: ({ row }) => (
-        <span className="text-zinc-400">
+        <span className="text-muted-foreground">
           {TEMPLATE_LABELS[row.original.template] ?? row.original.template}
         </span>
       ),
@@ -112,8 +212,8 @@ export default function ReportsPage() {
       accessorKey: 'created_at',
       header: 'Created',
       cell: ({ row }) => (
-        <span className="text-zinc-500 text-xs">
-          {formatDateTime(row.original.created_at)}
+        <span className="text-muted-foreground text-xs">
+          <ClientDate date={row.original.created_at} />
         </span>
       ),
     },
@@ -125,9 +225,17 @@ export default function ReportsPage() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => setPreview(row.original)}
+            onClick={() => router.push(`/reports/${row.original.id}`)}
           >
             <Eye className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setPreview(row.original)}
+            title="Quick preview"
+          >
+            <FileText className="h-3.5 w-3.5" />
           </Button>
           <Button
             size="sm"
@@ -139,7 +247,7 @@ export default function ReportsPage() {
           <Button
             size="sm"
             variant="ghost"
-            className="text-red-400 hover:text-red-300"
+            className="text-destructive hover:text-destructive/80"
             onClick={() => handleDelete(row.original.id)}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -158,6 +266,100 @@ export default function ReportsPage() {
     )
   }
 
+  const newReportButton = (
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <DialogTrigger asChild>
+        <Button onClick={handleOpenDialog}>
+          <Plus className="mr-1.5 h-4 w-4" />
+          New Report
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Generate Due Diligence Report</DialogTitle>
+          <DialogDescription>
+            Select an investigation and template. The AI will draft a formal
+            narrative from screening results.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Investigation</label>
+            <Select
+              value={selectedInvestigation}
+              onValueChange={setSelectedInvestigation}
+              disabled={investigations.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    investigations.length === 0
+                      ? 'Loading investigations…'
+                      : 'Select investigation'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {investigations.map((inv) => (
+                  <SelectItem key={inv.id} value={inv.id}>
+                    {inv.entity_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Template</label>
+            <Select
+              value={selectedTemplate}
+              onValueChange={setSelectedTemplate}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TEMPLATE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {createError && (
+            <p className="text-xs text-destructive">{createError}</p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setDialogOpen(false)}
+            disabled={creating}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleCreateReport} disabled={creating || !selectedInvestigation}>
+            {creating ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                Generate Report
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -167,12 +369,7 @@ export default function ReportsPage() {
             Generate and manage due diligence reports
           </p>
         </div>
-        <Link href="/reports/new">
-          <Button>
-            <Plus className="mr-1.5 h-4 w-4" />
-            New Report
-          </Button>
-        </Link>
+        {newReportButton}
       </div>
 
       {reports.length === 0 ? (
@@ -180,14 +377,7 @@ export default function ReportsPage() {
           icon={FileText}
           title="No reports yet"
           description="Create your first due diligence report from an investigation."
-          action={
-            <Link href="/reports/new">
-              <Button>
-                <Plus className="mr-1.5 h-4 w-4" />
-                New Report
-              </Button>
-            </Link>
-          }
+          action={newReportButton}
         />
       ) : (
         <div className="flex gap-4">
@@ -195,7 +385,7 @@ export default function ReportsPage() {
             <DataTable columns={columns} data={reports} searchable searchPlaceholder="Search reports…" />
           </div>
           {preview && (
-            <div className="w-1/2 rounded-lg border border-zinc-800 bg-zinc-950">
+            <div className="w-1/2 rounded-lg border border-border bg-card">
               <ReportPreview
                 reportId={preview.id}
                 investigationId={preview.investigation_id}

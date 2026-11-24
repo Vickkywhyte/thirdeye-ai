@@ -49,7 +49,7 @@ function assessmentColor(assessment: string) {
     case 'low':
       return 'border-green-500/30 bg-green-500/10 text-green-400'
     default:
-      return 'border-zinc-500/30 bg-zinc-500/10 text-zinc-400'
+      return 'border-border bg-muted text-muted-foreground'
   }
 }
 
@@ -106,14 +106,20 @@ export function AiAnalysisCard({
         { method: 'POST' }
       )
       if (!res.ok) {
-        const json = await res.json()
-        setError(json.error ?? 'Failed to generate analysis')
+        const json = await res.json().catch(() => null)
+        setError(
+          json?.error ?? `Request failed with status ${res.status}`
+        )
         return
       }
       const json = await res.json()
       setAnalysis(json.data?.analysis ?? null)
-    } catch {
-      setError('Failed to connect to AI service')
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Failed to reach the server: ${err.message}`
+          : 'Failed to connect to AI service'
+      )
     } finally {
       setGenerating(false)
     }
@@ -126,7 +132,7 @@ export function AiAnalysisCard({
           <CardTitle className="text-base">AI Analysis</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
     )
@@ -152,8 +158,8 @@ export function AiAnalysisCard({
             <Brain className="h-10 w-10 text-purple-400 animate-pulse" />
             <Sparkles className="absolute -right-1 -top-1 h-4 w-4 text-purple-300 animate-ping" />
           </div>
-          <p className="mt-4 text-sm text-zinc-400">Analysing screening data…</p>
-          <p className="mt-1 text-xs text-zinc-600">
+          <p className="mt-4 text-sm text-muted-foreground">Analysing screening data…</p>
+          <p className="mt-1 text-xs text-muted-foreground/60">
             This may take 15–30 seconds
           </p>
         </CardContent>
@@ -169,14 +175,21 @@ export function AiAnalysisCard({
           <CardDescription>Automated risk assessment summary</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center py-8">
-          <Brain className="h-10 w-10 text-zinc-600" />
-          <p className="mt-3 text-sm text-zinc-400">
+          <Brain className="h-10 w-10 text-muted-foreground/40" />
+          <p className="mt-3 text-sm text-muted-foreground">
             {hasScreeningResults
               ? 'Generate an AI-powered risk analysis from screening results.'
               : 'Run screening first to enable AI analysis.'}
           </p>
           {error && (
-            <p className="mt-2 text-xs text-red-400">{error}</p>
+            <div className="mt-3 w-full rounded-md border border-red-500/30 bg-red-500/10 p-3 text-left">
+              <p className="text-xs font-semibold text-red-400">
+                AI analysis failed
+              </p>
+              <p className="mt-1 break-words text-xs leading-relaxed text-red-300/90">
+                {error}
+              </p>
+            </div>
           )}
           <Button
             className="mt-4"
@@ -221,7 +234,7 @@ export function AiAnalysisCard({
             {analysis.overallAssessment.toUpperCase()} RISK
           </Badge>
           <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-24 rounded-full bg-zinc-800">
+            <div className="h-1.5 w-24 rounded-full bg-muted">
               <div
                 className="h-1.5 rounded-full bg-purple-500 transition-all"
                 style={{
@@ -229,26 +242,26 @@ export function AiAnalysisCard({
                 }}
               />
             </div>
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-muted-foreground">
               {Math.round(analysis.confidenceScore * 100)}% confidence
             </span>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm leading-relaxed text-zinc-300 whitespace-pre-line">
+        <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
           {analysis.summary}
         </p>
 
         {analysis.keyFindings.length > 0 && (
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Key Findings
             </h4>
             <ul className="space-y-1.5">
               {analysis.keyFindings.map((finding, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-zinc-500" />
+                <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />
                   {finding}
                 </li>
               ))}
@@ -258,22 +271,22 @@ export function AiAnalysisCard({
 
         {analysis.riskFactors.length > 0 && (
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Risk Factors
             </h4>
             <div className="space-y-2">
               {analysis.riskFactors.map((factor, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-2 rounded-md border border-zinc-800 bg-zinc-900/50 p-2.5"
+                  className="flex items-start gap-2 rounded-md border border-border bg-muted/50 p-2.5"
                 >
                   {severityIcon(factor.severity)}
                   <div className="min-w-0">
-                    <p className="text-sm text-zinc-300">
+                    <p className="text-sm text-foreground">
                       {factor.description}
                     </p>
                     {factor.evidence && (
-                      <p className="mt-0.5 text-xs text-zinc-500">
+                      <p className="mt-0.5 text-xs text-muted-foreground">
                         {factor.evidence}
                       </p>
                     )}
@@ -286,12 +299,12 @@ export function AiAnalysisCard({
 
         {analysis.recommendedActions.length > 0 && (
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Recommended Actions
             </h4>
             <ol className="list-decimal space-y-1 pl-4">
               {analysis.recommendedActions.map((action, i) => (
-                <li key={i} className="text-sm text-zinc-300">
+                <li key={i} className="text-sm text-foreground">
                   {action}
                 </li>
               ))}

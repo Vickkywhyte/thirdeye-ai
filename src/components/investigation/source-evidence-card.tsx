@@ -50,6 +50,7 @@ const DISPLAY_KEYS = [
   'dateOfCreation',
   'tone',
   'description',
+  'aiSummary',
 ]
 
 export function SourceEvidenceCard({

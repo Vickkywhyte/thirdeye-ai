@@ -1,12 +1,14 @@
 import { createLogger } from '@/lib/monitoring/logger'
 import { measureAsync } from '@/lib/monitoring/performance'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { ingestOwnership } from '@/lib/graph/ingest-ownership'
 
 const logger = createLogger('screening-orchestrator')
 import { sanctionsProvider } from './sanctions'
 import { pepProvider } from './pep'
 import { adverseMediaProvider } from './adverse-media'
 import { registryProvider } from './registry'
+import { applicableScreeningTypes } from './types'
 import type {
   ScreeningEntity,
   ScreeningProvider,
@@ -54,10 +56,26 @@ export async function runScreening(
   types: ScreeningTypeValue[],
   entity: ScreeningEntity
 ): Promise<{ results: ScreeningResult[]; riskScore: number }> {
-  logger.info('Starting screening', { investigationId, types, entityName: entity.name })
+  // Registry checks don't apply to a natural person. Filtered here too, so any
+  // caller gets the same behaviour as the screening route.
+  const effectiveTypes = applicableScreeningTypes(entity.type, types)
+  const skipped = types.filter((t) => !effectiveTypes.includes(t))
+  if (skipped.length > 0) {
+    logger.info('Skipping checks that do not apply to this entity type', {
+      investigationId,
+      entityType: entity.type,
+      skipped,
+    })
+  }
+
+  logger.info('Starting screening', {
+    investigationId,
+    types: effectiveTypes,
+    entityName: entity.name,
+  })
   const supabase = createAdminClient()
 
-  const screeningPromises = types.map(async (type) => {
+  const screeningPromises = effectiveTypes.map(async (type) => {
     const provider = PROVIDERS[type]
     if (!provider) {
       return {
@@ -68,19 +86,50 @@ export async function runScreening(
       } satisfies ScreeningResult
     }
 
-    await supabase
+    // Resolve the row's primary key once. Every write below targets it by id,
+    // so a mismatched filter can never silently update zero rows.
+    const { data: resultRow, error: rowErr } = await supabase
+      .from('screening_results')
+      .select('id')
+      .eq('investigation_id', investigationId)
+      .eq('type', type as 'sanctions' | 'pep' | 'adverse_media' | 'registry')
+      .single()
+
+    if (rowErr || !resultRow) {
+      const msg = `No screening_results row for type "${type}" — it must be created before screening runs`
+      logger.error(msg, { investigationId, error: rowErr?.message ?? null })
+      return {
+        type,
+        hits: [],
+        rawData: {},
+        error: msg,
+      } satisfies ScreeningResult
+    }
+
+    const resultId = resultRow.id
+
+    const { error: runningErr } = await supabase
       .from('screening_results')
       .update({
         status: 'running' as const,
         started_at: new Date().toISOString(),
       })
-      .eq('investigation_id', investigationId)
-      .eq('type', type as 'sanctions' | 'pep' | 'adverse_media' | 'registry')
+      .eq('id', resultId)
+
+    if (runningErr) {
+      logger.error(`Failed to mark ${type} as running`, {
+        investigationId,
+        resultId,
+        error: runningErr.message,
+      })
+    }
 
     try {
+      logger.info(`Running provider: ${type}`, { investigationId })
       const result = await provider.screen(entity)
+      logger.info(`Provider ${type} finished`, { hits: result.hits.length, error: result.error ?? null })
 
-      await supabase
+      const { error: updateErr } = await supabase
         .from('screening_results')
         .update({
           status: (result.error ? 'failed' : 'completed') as 'failed' | 'completed',
@@ -89,12 +138,42 @@ export async function runScreening(
           error_message: result.error ?? null,
           completed_at: new Date().toISOString(),
         })
-        .eq('investigation_id', investigationId)
-        .eq('type', type as 'sanctions' | 'pep' | 'adverse_media' | 'registry')
+        .eq('id', resultId)
+
+      if (updateErr) {
+        logger.error(`Failed to update screening_results for ${type}`, {
+          investigationId,
+          resultId,
+          error: updateErr.message,
+        })
+      }
+
+      // Registry results carry PSC/officer relationships. Persist them as
+      // graph edges -- without this the ownership graph only ever has the
+      // subject node, because nothing else writes to ownership_links.
+      if (result.ownership && result.ownership.length > 0) {
+        try {
+          const ingested = await ingestOwnership(
+            investigationId,
+            result.ownership
+          )
+          logger.info('Ownership relationships persisted', {
+            investigationId,
+            type,
+            ...ingested,
+          })
+        } catch (err) {
+          logger.error('Failed persisting ownership relationships', {
+            investigationId,
+            type,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
 
       if (result.hits.length > 0) {
         const hitRows = result.hits.map((hit) => ({
-          result_id: '',
+          result_id: resultId,
           source: hit.source,
           match_score: hit.matchScore,
           matched_name: hit.matchedName,
@@ -102,19 +181,17 @@ export async function runScreening(
           is_confirmed: false,
         }))
 
-        const { data: screeningResult } = await supabase
-          .from('screening_results')
-          .select('id')
-          .eq('investigation_id', investigationId)
-          .eq('type', type as 'sanctions' | 'pep' | 'adverse_media' | 'registry')
-          .single()
+        const { error: hitsErr } = await supabase
+          .from('screening_hits')
+          .insert(hitRows)
 
-        if (screeningResult) {
-          const rowsWithResultId = hitRows.map((row) => ({
-            ...row,
-            result_id: screeningResult.id,
-          }))
-          await supabase.from('screening_hits').insert(rowsWithResultId)
+        if (hitsErr) {
+          logger.error(`Failed to insert screening_hits for ${type}`, {
+            investigationId,
+            resultId,
+            hitCount: hitRows.length,
+            error: hitsErr.message,
+          })
         }
       }
 
@@ -130,8 +207,7 @@ export async function runScreening(
           error_message: errorMsg,
           completed_at: new Date().toISOString(),
         })
-        .eq('investigation_id', investigationId)
-        .eq('type', type as 'sanctions' | 'pep' | 'adverse_media' | 'registry')
+        .eq('id', resultId)
 
       return {
         type,
@@ -159,7 +235,7 @@ export async function runScreening(
     investigation_id: investigationId,
     event_type: 'screening_completed',
     title: 'Screening completed',
-    description: `Risk score: ${riskScore}/100. ${results.reduce((sum, r) => sum + r.hits.length, 0)} total hits across ${types.length} checks.`,
+    description: `Risk score: ${riskScore}/100. ${results.reduce((sum, r) => sum + r.hits.length, 0)} total hits across ${effectiveTypes.length} checks.`,
   })
 
   return { results, riskScore }

@@ -35,6 +35,11 @@ export type Permission =
   | 'audit_log:read'
   | 'settings:read'
   | 'settings:update'
+  | 'applications:read'
+  | 'applications:create'
+  | 'applications:update'
+  | 'decisions:read'
+  | 'decisions:create'
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   owner: [
@@ -49,6 +54,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'api_keys:read', 'api_keys:manage',
     'audit_log:read',
     'settings:read', 'settings:update',
+    'applications:read', 'applications:create', 'applications:update',
+    'decisions:read', 'decisions:create',
   ],
   admin: [
     'investigations:read', 'investigations:create', 'investigations:update', 'investigations:delete',
@@ -62,6 +69,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'api_keys:read', 'api_keys:manage',
     'audit_log:read',
     'settings:read', 'settings:update',
+    'applications:read', 'applications:create', 'applications:update',
+    'decisions:read', 'decisions:create',
   ],
   analyst: [
     'investigations:read', 'investigations:create', 'investigations:update',
@@ -74,6 +83,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'org:read',
     'audit_log:read',
     'settings:read',
+    'applications:read', 'applications:create', 'applications:update',
+    'decisions:read', 'decisions:create',
   ],
   viewer: [
     'investigations:read',
@@ -84,6 +95,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'users:read',
     'org:read',
     'settings:read',
+    'applications:read',
+    'decisions:read',
   ],
 } as const
 

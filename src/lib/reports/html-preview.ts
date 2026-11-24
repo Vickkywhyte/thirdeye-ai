@@ -23,6 +23,7 @@ function templateTitle(template: ReportTemplate): string {
     case 'enhanced_dd': return 'Enhanced Due Diligence Report'
     case 'sanctions_alert': return 'Screening Summary Report'
     case 'periodic_review': return 'Periodic Review Report'
+    default: return 'Due Diligence Report'
   }
 }
 

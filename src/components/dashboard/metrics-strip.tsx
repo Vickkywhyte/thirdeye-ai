@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Eye,
+  Radio,
   TrendingUp,
 } from 'lucide-react'
 import type { DashboardMetrics } from '@/lib/analytics/queries'
@@ -61,13 +62,19 @@ const CARDS = [
     icon: TrendingUp,
     color: 'text-purple-400',
   },
+  {
+    key: 'monitoredCount' as const,
+    label: 'Portfolio Monitored',
+    icon: Radio,
+    color: 'text-teal-400',
+  },
 ]
 
 export function MetricsStrip({ metrics, isLoading }: MetricsStripProps) {
   if (isLoading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, i) => (
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
+        {Array.from({ length: 7 }).map((_, i) => (
           <Card key={i}>
             <CardContent className="p-4">
               <Skeleton className="h-4 w-20 mb-2" />
@@ -82,7 +89,7 @@ export function MetricsStrip({ metrics, isLoading }: MetricsStripProps) {
   if (!metrics) return null
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
       {CARDS.map((card) => {
         const value = metrics[card.key]
         const Icon = card.icon

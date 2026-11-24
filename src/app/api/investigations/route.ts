@@ -84,11 +84,14 @@ export async function POST(request: NextRequest) {
         type: parsed.data.entity_type,
         jurisdiction: parsed.data.jurisdiction,
         registration_number: parsed.data.registration_number,
+        counterparty_type: parsed.data.counterparty_type ?? null,
       })
       .select()
       .single()
 
     if (entityError) return apiError(entityError.message, 500, 'DB_ERROR')
+
+    const parentId = parsed.data.parent_investigation_id ?? null
 
     const { data: investigation, error: invError } = await supabase
       .from('investigations')
@@ -97,6 +100,7 @@ export async function POST(request: NextRequest) {
         entity_id: entity.id,
         created_by: user.id,
         status: 'active',
+        parent_investigation_id: parentId,
       })
       .select()
       .single()
@@ -110,6 +114,18 @@ export async function POST(request: NextRequest) {
       description: `Investigation opened for ${entity.name}`,
       created_by: user.id,
     })
+
+    // Log on the parent investigation's timeline so there is an audit trail
+    // linking the two investigations together.
+    if (parentId) {
+      await supabase.from('timeline_events').insert({
+        investigation_id: parentId,
+        event_type: 'child_investigation_opened',
+        title: `Child investigation opened`,
+        description: `Linked investigation created for ${entity.name} (${entity.type})`,
+        created_by: user.id,
+      })
+    }
 
     await logAuditEvent(supabase as never, {
       userId: user.id,

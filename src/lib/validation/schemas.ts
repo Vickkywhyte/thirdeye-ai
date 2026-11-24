@@ -44,6 +44,15 @@ export const newPasswordSchema = z
   })
 export type NewPasswordInput = z.infer<typeof newPasswordSchema>
 
+export const COUNTERPARTY_TYPES = [
+  'merchant',
+  'partner',
+  'psp',
+  'vendor',
+  'respondent_institution',
+  'other',
+] as const
+
 export const entitySchema = z.object({
   name: z.string().min(1, 'Entity name is required'),
   type: z.enum(['individual', 'company', 'trust', 'partnership', 'other']),
@@ -51,8 +60,10 @@ export const entitySchema = z.object({
   registration_number: z.string().optional(),
   date_of_birth: z.string().optional(),
   address: z.string().optional(),
+  counterparty_type: z.enum(COUNTERPARTY_TYPES).nullable().optional(),
 })
 export type EntityInput = z.infer<typeof entitySchema>
+export type CounterpartyType = (typeof COUNTERPARTY_TYPES)[number]
 
 export const investigationSchema = z.object({
   entity_id: z.string().uuid('Invalid entity ID'),
@@ -67,6 +78,8 @@ export const createInvestigationSchema = z.object({
   entity_type: z.enum(['individual', 'company', 'trust', 'partnership', 'other']),
   jurisdiction: z.string().optional(),
   registration_number: z.string().optional(),
+  parent_investigation_id: z.string().uuid('Invalid parent investigation ID').optional(),
+  counterparty_type: z.enum(COUNTERPARTY_TYPES).nullable().optional(),
 })
 export type CreateInvestigationInput = z.infer<typeof createInvestigationSchema>
 
@@ -99,3 +112,33 @@ export const screeningSchema = z.object({
     .min(1, 'Select at least one screening type'),
 })
 export type ScreeningInput = z.infer<typeof screeningSchema>
+
+export const APPLICATION_STATUSES = [
+  'draft',
+  'submitted',
+  'under_review',
+  'decided',
+] as const
+
+export const createApplicationSchema = z.object({
+  investigation_id: z.string().uuid('Invalid investigation ID'),
+  status: z.enum(['draft', 'submitted']).default('draft'),
+})
+export type CreateApplicationInput = z.infer<typeof createApplicationSchema>
+
+export const updateApplicationSchema = z.object({
+  status: z.enum(APPLICATION_STATUSES),
+})
+export type UpdateApplicationInput = z.infer<typeof updateApplicationSchema>
+
+export const DECISION_TYPES = ['approve', 'reject', 'refer'] as const
+
+export const createDecisionSchema = z.object({
+  decision_type: z.enum(DECISION_TYPES),
+  rationale: z
+    .string()
+    .min(20, 'Rationale must be at least 20 characters')
+    .max(5000, 'Rationale is too long'),
+  source_id: z.string().uuid('Invalid source ID').nullable().optional(),
+})
+export type CreateDecisionInput = z.infer<typeof createDecisionSchema>

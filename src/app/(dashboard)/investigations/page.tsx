@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { DataTable } from '@/components/shared/data-table'
 import { RiskScoreRing } from '@/components/investigation/risk-score-ring'
-import { formatDate } from '@/lib/utils/formatting'
+import { ClientDate } from '@/components/shared/client-date'
 
 type InvestigationRow = {
   id: string
@@ -25,6 +25,7 @@ type InvestigationRow = {
   risk_score: number | null
   assigned_to: string | null
   updated_at: string
+  last_screened_at: string | null
   entity: {
     id: string
     name: string
@@ -91,9 +92,21 @@ const columns: LegacyColumnDef<InvestigationRow, unknown>[] = [
     header: 'Last Updated',
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
-        {formatDate(row.original.updated_at)}
+        <ClientDate date={row.original.updated_at} variant="date" />
       </span>
     ),
+  },
+  {
+    accessorKey: 'last_screened_at',
+    header: 'Last Monitored',
+    cell: ({ row }) =>
+      row.original.last_screened_at ? (
+        <span className="text-sm text-muted-foreground">
+          <ClientDate date={row.original.last_screened_at} variant="relative" />
+        </span>
+      ) : (
+        <span className="text-xs text-muted-foreground">Never</span>
+      ),
   },
 ]
 

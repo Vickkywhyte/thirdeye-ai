@@ -26,26 +26,26 @@ const RELATIONSHIP_LABELS = [
 ]
 
 export function GraphLegend() {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
 
   return (
-    <div className="absolute bottom-4 left-4 z-10 rounded-lg border border-zinc-700 bg-zinc-900/95 p-3 backdrop-blur-sm">
+    <div className="absolute bottom-4 right-4 z-10 rounded-lg border border-border bg-background/90 p-3 backdrop-blur-sm shadow-sm">
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="flex w-full items-center justify-between text-xs font-medium text-zinc-300"
+        className="flex w-full items-center justify-between gap-4 text-xs font-medium text-foreground"
       >
         Legend
         {collapsed ? (
-          <ChevronUp className="h-3 w-3" />
-        ) : (
           <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronUp className="h-3 w-3" />
         )}
       </button>
 
       {!collapsed && (
         <div className="mt-2 space-y-3">
           <div>
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Risk Level
             </p>
             <div className="space-y-1">
@@ -55,14 +55,14 @@ export function GraphLegend() {
                     className="h-2.5 w-2.5 rounded-full"
                     style={{ backgroundColor: RISK_COLORS[r.key] }}
                   />
-                  <span className="text-zinc-400">{r.label}</span>
+                  <span className="text-muted-foreground">{r.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Ownership %
             </p>
             <div className="space-y-1">
@@ -74,18 +74,19 @@ export function GraphLegend() {
                       y1="4"
                       x2="24"
                       y2="4"
-                      stroke="#9CA3AF"
+                      stroke="currentColor"
                       strokeWidth={t.width}
+                      className="text-muted-foreground"
                     />
                   </svg>
-                  <span className="text-zinc-400">{t.label}</span>
+                  <span className="text-muted-foreground">{t.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Relationship
             </p>
             <div className="space-y-1">
@@ -97,8 +98,9 @@ export function GraphLegend() {
                       y1="4"
                       x2="24"
                       y2="4"
-                      stroke="#9CA3AF"
+                      stroke="currentColor"
                       strokeWidth={1.5}
+                      className="text-muted-foreground"
                       strokeDasharray={
                         r.style === 'dashed'
                           ? '4 2'
@@ -110,7 +112,7 @@ export function GraphLegend() {
                       }
                     />
                   </svg>
-                  <span className="text-zinc-400">{r.label}</span>
+                  <span className="text-muted-foreground">{r.label}</span>
                 </div>
               ))}
             </div>

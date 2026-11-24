@@ -1,10 +1,10 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Search, Bell, LogOut, User } from 'lucide-react'
+import { Search, LogOut, Moon, Sun, User } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { createClient } from '@/lib/supabase/client'
 import { useUIStore } from '@/stores/ui-store'
-import { useNotificationStore } from '@/stores/notification-store'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { NotificationCenter } from '@/components/layout/notification-center'
 import type { AuthUser } from '@/lib/auth/session'
 
 function getInitials(name: string) {
@@ -28,8 +29,8 @@ function getInitials(name: string) {
 
 export function TopBar({ user }: { user: AuthUser }) {
   const router = useRouter()
+  const { theme, setTheme } = useTheme()
   const setCommandPaletteOpen = useUIStore((s) => s.setCommandPaletteOpen)
-  const unreadCount = useNotificationStore((s) => s.unreadCount)
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -54,14 +55,20 @@ export function TopBar({ user }: { user: AuthUser }) {
       </Button>
 
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-risk-critical text-[10px] font-bold text-white">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          aria-label="Toggle theme"
+        >
+          {theme === 'dark' ? (
+            <Sun className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
           )}
         </Button>
+
+        <NotificationCenter />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -7,6 +7,7 @@ export interface DashboardMetrics {
   avgRiskScore: number
   highRiskCount: number
   pendingReviews: number
+  monitoredCount: number
 }
 
 export interface RiskBand {
@@ -58,7 +59,7 @@ export async function getDashboardMetrics(
 
   const { data: investigations } = await supabase
     .from('investigations')
-    .select('id, status, risk_score')
+    .select('id, status, risk_score, last_screened_at')
     .eq('org_id', orgId)
 
   const all = investigations ?? []
@@ -68,6 +69,7 @@ export async function getDashboardMetrics(
   const highRiskCount = all.filter(
     (i) => i.risk_score !== null && i.risk_score >= 60
   ).length
+  const monitoredCount = all.filter((i) => i.last_screened_at !== null).length
 
   const scored = all.filter((i) => i.risk_score !== null)
   const avgRiskScore =
@@ -91,6 +93,7 @@ export async function getDashboardMetrics(
     avgRiskScore,
     highRiskCount,
     pendingReviews,
+    monitoredCount,
   }
 }
 

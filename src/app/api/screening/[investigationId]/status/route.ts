@@ -1,6 +1,6 @@
 import { getUser } from '@/lib/auth/session'
 import { hasPermission } from '@/lib/auth/rbac'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   apiSuccess,
   apiError,
@@ -18,7 +18,19 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (!hasPermission(user.role, 'investigations:read')) return apiForbidden()
 
     const { investigationId } = await params
-    const supabase = await createClient()
+    const supabase = createAdminClient()
+
+    // Verify the investigation belongs to the user's org
+    const { data: investigation } = await supabase
+      .from('investigations')
+      .select('id')
+      .eq('id', investigationId)
+      .eq('org_id', user.orgId)
+      .single()
+
+    if (!investigation) {
+      return apiError('Investigation not found', 404)
+    }
 
     const { data: results, error } = await supabase
       .from('screening_results')
@@ -31,7 +43,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     const resultsWithHits = await Promise.all(
-      results.map(async (r) => {
+      (results ?? []).map(async (r) => {
         const { data: hits } = await supabase
           .from('screening_hits')
           .select('*')
@@ -40,10 +52,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
       })
     )
 
-    const allCompleted = results.every(
+    const allCompleted = (results ?? []).every(
       (r) => r.status === 'completed' || r.status === 'failed'
     )
-    const anyRunning = results.some(
+    const anyRunning = (results ?? []).some(
       (r) => r.status === 'running' || r.status === 'pending'
     )
 

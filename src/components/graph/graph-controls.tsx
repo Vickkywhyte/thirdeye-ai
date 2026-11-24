@@ -15,9 +15,9 @@ interface GraphControlsProps {
 }
 
 const LAYOUTS: { value: GraphLayout; label: string }[] = [
-  { value: 'force', label: 'Force' },
   { value: 'tree', label: 'Tree' },
   { value: 'radial', label: 'Radial' },
+  { value: 'force', label: 'Force' },
 ]
 
 export function GraphControls({
@@ -31,12 +31,12 @@ export function GraphControls({
   }
 
   return (
-    <div className="absolute right-4 top-4 z-10 w-52 rounded-lg border border-zinc-700 bg-zinc-900/95 p-3 backdrop-blur-sm">
-      <p className="mb-3 text-xs font-medium text-zinc-300">Controls</p>
+    <div className="absolute right-4 top-4 z-10 w-52 rounded-lg border border-border bg-background/90 p-3 backdrop-blur-sm shadow-sm">
+      <p className="mb-3 text-xs font-medium text-foreground">Controls</p>
 
       <div className="space-y-3">
         <div>
-          <Label className="text-[11px] text-zinc-500">Layout</Label>
+          <Label className="text-[11px] text-muted-foreground">Layout</Label>
           <div className="mt-1 flex gap-1">
             {LAYOUTS.map((l) => (
               <button
@@ -44,8 +44,8 @@ export function GraphControls({
                 onClick={() => update({ layout: l.value })}
                 className={`flex-1 rounded px-2 py-1 text-[11px] transition-colors ${
                   config.layout === l.value
-                    ? 'bg-zinc-700 text-zinc-200'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
               >
                 {l.label}
@@ -55,7 +55,7 @@ export function GraphControls({
         </div>
 
         <div className="flex items-center justify-between">
-          <Label className="text-[11px] text-zinc-500">Show Labels</Label>
+          <Label className="text-[11px] text-muted-foreground">Show Labels</Label>
           <Switch
             checked={config.showLabels}
             onCheckedChange={(v) => update({ showLabels: v })}
@@ -63,7 +63,7 @@ export function GraphControls({
         </div>
 
         <div className="flex items-center justify-between">
-          <Label className="text-[11px] text-zinc-500">Show Ownership %</Label>
+          <Label className="text-[11px] text-muted-foreground">Show Ownership %</Label>
           <Switch
             checked={config.showPercentages}
             onCheckedChange={(v) => update({ showPercentages: v })}
@@ -71,7 +71,7 @@ export function GraphControls({
         </div>
 
         <div className="flex items-center justify-between">
-          <Label className="text-[11px] text-zinc-500">Highlight Risk</Label>
+          <Label className="text-[11px] text-muted-foreground">Highlight Risk</Label>
           <Switch
             checked={config.highlightRisk}
             onCheckedChange={(v) => update({ highlightRisk: v })}
@@ -79,7 +79,7 @@ export function GraphControls({
         </div>
 
         <div>
-          <Label className="text-[11px] text-zinc-500">
+          <Label className="text-[11px] text-muted-foreground">
             Min Ownership: {config.minOwnershipThreshold}%
           </Label>
           <Slider

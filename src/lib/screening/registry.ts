@@ -1,6 +1,7 @@
 import {
   SCREENING_TYPES,
   classifySeverity,
+  type OwnershipRelation,
   type ScreeningEntity,
   type ScreeningHit,
   type ScreeningProvider,
@@ -8,6 +9,9 @@ import {
 } from './types'
 
 const CH_BASE = 'https://api.company-information.service.gov.uk'
+
+/** Companies House rejects a request with no credentials, so surface that clearly. */
+class RegistryAuthError extends Error {}
 
 function getHeaders(): HeadersInit {
   const key = process.env.COMPANIES_HOUSE_API_KEY
@@ -37,63 +41,103 @@ interface CompanyProfile {
 interface PSCEntry {
   name?: string
   name_elements?: { forename: string; surname: string }
-  natures_of_control: string[]
+  natures_of_control?: string[]
   kind: string
-  notified_on: string
+  notified_on?: string
+  ceased_on?: string
   country_of_residence?: string
   nationality?: string
 }
 
-async function searchCompanies(
+interface OfficerEntry {
   name: string
-): Promise<CompanySearchItem[]> {
-  const apiKey = process.env.COMPANIES_HOUSE_API_KEY
-  if (!apiKey) return []
-
-  try {
-    const url = `${CH_BASE}/search/companies?q=${encodeURIComponent(name)}&items_per_page=10`
-    const res = await fetch(url, {
-      headers: getHeaders(),
-      signal: AbortSignal.timeout(10000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.items ?? []
-  } catch {
-    return []
-  }
+  officer_role: string
+  appointed_on?: string
+  resigned_on?: string
+  nationality?: string
+  country_of_residence?: string
+  occupation?: string
 }
 
-async function getCompanyProfile(
-  number: string
-): Promise<CompanyProfile | null> {
-  try {
-    const res = await fetch(`${CH_BASE}/company/${number}`, {
-      headers: getHeaders(),
-      signal: AbortSignal.timeout(10000),
-    })
-    if (!res.ok) return null
-    return await res.json()
-  } catch {
-    return null
+/**
+ * Single place where Companies House HTTP failures are classified. A 401 used
+ * to be swallowed into an empty array, which surfaced as "0 hits" and hid a
+ * bad API key entirely.
+ */
+async function chFetch<T>(path: string): Promise<T | null> {
+  const res = await fetch(`${CH_BASE}${path}`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10000),
+  })
+
+  if (res.status === 401 || res.status === 403) {
+    const body = await res.text().catch(() => '')
+    throw new RegistryAuthError(
+      `Companies House rejected the API key (${res.status}): ${body.trim() || 'no detail'}. ` +
+        'Check COMPANIES_HOUSE_API_KEY is a live REST key (not a Streaming or sandbox key) for an activated application.'
+    )
   }
+
+  // 404 is a legitimate "no such company / no filings" answer.
+  if (res.status === 404) return null
+  if (!res.ok) {
+    throw new Error(`Companies House returned ${res.status} for ${path}`)
+  }
+
+  return (await res.json()) as T
+}
+
+async function searchCompanies(name: string): Promise<CompanySearchItem[]> {
+  const data = await chFetch<{ items?: CompanySearchItem[] }>(
+    `/search/companies?q=${encodeURIComponent(name)}&items_per_page=10`
+  )
+  return data?.items ?? []
+}
+
+function getCompanyProfile(number: string): Promise<CompanyProfile | null> {
+  return chFetch<CompanyProfile>(`/company/${encodeURIComponent(number)}`)
 }
 
 async function getPSCs(number: string): Promise<PSCEntry[]> {
-  try {
-    const res = await fetch(
-      `${CH_BASE}/company/${number}/persons-with-significant-control`,
-      {
-        headers: getHeaders(),
-        signal: AbortSignal.timeout(10000),
-      }
-    )
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.items ?? []
-  } catch {
-    return []
+  const data = await chFetch<{ items?: PSCEntry[] }>(
+    `/company/${encodeURIComponent(number)}/persons-with-significant-control`
+  )
+  return data?.items ?? []
+}
+
+async function getOfficers(number: string): Promise<OfficerEntry[]> {
+  const data = await chFetch<{ items?: OfficerEntry[] }>(
+    `/company/${encodeURIComponent(number)}/officers`
+  )
+  return data?.items ?? []
+}
+
+/**
+ * Companies House publishes ownership as bands, e.g.
+ * "ownership-of-shares-25-to-50-percent". Return the band's lower bound.
+ */
+function parseOwnershipPct(naturesOfControl: string[]): number | null {
+  for (const nature of naturesOfControl) {
+    const band = nature.match(/(\d+)-to-(\d+)-percent/)
+    if (band) return Number(band[1])
+    const exact = nature.match(/(\d+)-percent/)
+    if (exact) return Number(exact[1])
   }
+  return null
+}
+
+function pscName(psc: PSCEntry): string {
+  if (psc.name) return psc.name
+  if (psc.name_elements) {
+    return `${psc.name_elements.forename} ${psc.name_elements.surname}`.trim()
+  }
+  return 'Unknown'
+}
+
+function pscEntityType(kind: string): 'individual' | 'company' {
+  return kind.includes('corporate') || kind.includes('legal-person')
+    ? 'company'
+    : 'individual'
 }
 
 export const registryProvider: ScreeningProvider = {
@@ -101,7 +145,11 @@ export const registryProvider: ScreeningProvider = {
 
   async screen(entity: ScreeningEntity): Promise<ScreeningResult> {
     const apiKey = process.env.COMPANIES_HOUSE_API_KEY
+    console.log('[registry] Starting registry screening for:', entity.name)
+    console.log('[registry] COMPANIES_HOUSE_API_KEY configured:', !!apiKey)
+
     if (!apiKey) {
+      console.warn('[registry] No API key — skipping')
       return {
         type: SCREENING_TYPES.REGISTRY,
         hits: [],
@@ -111,77 +159,160 @@ export const registryProvider: ScreeningProvider = {
     }
 
     try {
-      const companies = await searchCompanies(entity.name)
-      if (companies.length === 0) {
-        return {
-          type: SCREENING_TYPES.REGISTRY,
-          hits: [],
-          rawData: { searchResults: 0 },
+      let companyNumber: string | null = null
+      let matchedTitle: string | null = null
+      let searchResultCount = 0
+      let resolvedBy: 'registration_number' | 'name_search' = 'name_search'
+
+      // A registration number is an exact identifier: resolve it directly
+      // rather than hoping it appears in the top 10 fuzzy name matches.
+      if (entity.registration_number) {
+        const direct = await getCompanyProfile(entity.registration_number)
+        if (direct) {
+          companyNumber = direct.company_number
+          matchedTitle = direct.company_name
+          resolvedBy = 'registration_number'
+          console.log(
+            '[registry] Resolved directly by registration number:',
+            companyNumber
+          )
+        } else {
+          console.warn(
+            '[registry] Registration number not found, falling back to name search:',
+            entity.registration_number
+          )
         }
       }
 
-      const hits: ScreeningHit[] = []
+      if (!companyNumber) {
+        const companies = await searchCompanies(entity.name)
+        searchResultCount = companies.length
+        if (companies.length === 0) {
+          return {
+            type: SCREENING_TYPES.REGISTRY,
+            hits: [],
+            rawData: { searchResults: 0, resolvedBy: 'name_search' },
+          }
+        }
+        const best =
+          (entity.registration_number
+            ? companies.find(
+                (c) => c.company_number === entity.registration_number
+              )
+            : undefined) ?? companies[0]
+        companyNumber = best.company_number
+        matchedTitle = best.title
+      }
 
-      const bestMatch =
-        entity.registration_number
-          ? companies.find(
-              (c) => c.company_number === entity.registration_number
-            ) ?? companies[0]
-          : companies[0]
+      const [profile, pscs, officers] = await Promise.all([
+        getCompanyProfile(companyNumber),
+        getPSCs(companyNumber),
+        getOfficers(companyNumber),
+      ])
 
-      const profile = await getCompanyProfile(bestMatch.company_number)
-      const pscs = await getPSCs(bestMatch.company_number)
+      const resolvedName = profile?.company_name ?? matchedTitle ?? entity.name
+
+      // Only current appointments belong in an ownership graph.
+      const activePscs = pscs.filter((p) => !p.ceased_on)
+      const activeOfficers = officers.filter((o) => !o.resigned_on)
+
+      const ownership: OwnershipRelation[] = [
+        ...activePscs.map((p) => {
+          const natures = p.natures_of_control ?? []
+          return {
+            name: pscName(p),
+            kind: 'psc' as const,
+            entityType: pscEntityType(p.kind),
+            ownershipPct: parseOwnershipPct(natures),
+            role: natures.join(', ') || null,
+            nationality: p.nationality ?? null,
+            countryOfResidence: p.country_of_residence ?? null,
+            metadata: {
+              kind: p.kind,
+              naturesOfControl: natures,
+              notifiedOn: p.notified_on ?? null,
+            },
+          }
+        }),
+        ...activeOfficers.map((o) => ({
+          name: o.name,
+          kind: 'officer' as const,
+          entityType: o.officer_role?.includes('corporate')
+            ? ('company' as const)
+            : ('individual' as const),
+          ownershipPct: null,
+          role: o.officer_role ?? null,
+          nationality: o.nationality ?? null,
+          countryOfResidence: o.country_of_residence ?? null,
+          metadata: {
+            officerRole: o.officer_role,
+            appointedOn: o.appointed_on ?? null,
+            occupation: o.occupation ?? null,
+          },
+        })),
+      ]
 
       const nameMatch =
-        bestMatch.title.toLowerCase() === entity.name.toLowerCase() ? 95 : 70
+        resolvedBy === 'registration_number' ||
+        resolvedName.toLowerCase() === entity.name.toLowerCase()
+          ? 95
+          : 70
 
-      hits.push({
-        source: 'UK Companies House',
-        matchScore: nameMatch,
-        matchedName: bestMatch.title,
-        severity: classifySeverity(nameMatch),
-        data: {
-          companyNumber: bestMatch.company_number,
-          status: profile?.company_status ?? bestMatch.company_status,
-          type: profile?.type ?? bestMatch.company_type,
-          dateOfCreation:
-            profile?.date_of_creation ?? bestMatch.date_of_creation,
-          registeredAddress: profile?.registered_office_address ?? null,
-          sicCodes: profile?.sic_codes ?? [],
-          pscs: pscs.map((p) => ({
-            name:
-              p.name ??
-              (p.name_elements
-                ? `${p.name_elements.forename} ${p.name_elements.surname}`
-                : 'Unknown'),
-            naturesOfControl: p.natures_of_control,
-            kind: p.kind,
-            notifiedOn: p.notified_on,
-            countryOfResidence: p.country_of_residence,
-            nationality: p.nationality,
-          })),
+      const hits: ScreeningHit[] = [
+        {
+          source: 'UK Companies House',
+          matchScore: nameMatch,
+          matchedName: resolvedName,
+          severity: classifySeverity(nameMatch),
+          data: {
+            companyNumber,
+            resolvedBy,
+            status: profile?.company_status ?? null,
+            type: profile?.type ?? null,
+            dateOfCreation: profile?.date_of_creation ?? null,
+            registeredAddress: profile?.registered_office_address ?? null,
+            sicCodes: profile?.sic_codes ?? [],
+            pscCount: activePscs.length,
+            officerCount: activeOfficers.length,
+            pscs: ownership.filter((o) => o.kind === 'psc'),
+            officers: ownership.filter((o) => o.kind === 'officer'),
+          },
+          sourceUrl: `https://find-and-update.company-information.service.gov.uk/company/${companyNumber}`,
         },
-        sourceUrl: `https://find-and-update.company-information.service.gov.uk/company/${bestMatch.company_number}`,
-      })
+      ]
+
+      console.log(
+        '[registry] Completed — company:',
+        companyNumber,
+        '| resolvedBy:',
+        resolvedBy,
+        '| PSCs:',
+        activePscs.length,
+        '| officers:',
+        activeOfficers.length
+      )
 
       return {
         type: SCREENING_TYPES.REGISTRY,
         hits,
         rawData: {
-          searchResults: companies.length,
-          matchedCompany: bestMatch.company_number,
-          pscCount: pscs.length,
+          searchResults: searchResultCount,
+          matchedCompany: companyNumber,
+          resolvedBy,
+          pscCount: activePscs.length,
+          officerCount: activeOfficers.length,
         },
+        ownership,
       }
     } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Registry screening failed'
+      console.error('[registry] Failed:', message)
       return {
         type: SCREENING_TYPES.REGISTRY,
         hits: [],
         rawData: {},
-        error:
-          err instanceof Error
-            ? err.message
-            : 'Registry screening failed',
+        error: message,
       }
     }
   },

@@ -1,111 +1,36 @@
-'use client'
-
-import { useCallback, useEffect, useState } from 'react'
-import dynamic from 'next/dynamic'
-import { useParams } from 'next/navigation'
-import {
-  Building2,
-  Clock,
-  FileText,
-  GitBranch,
-  MessageSquare,
-  ShieldCheck,
-} from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Skeleton } from '@/components/ui/skeleton'
+import { redirect } from 'next/navigation'
+import { connection } from 'next/server'
+import { getUser } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { EmptyState } from '@/components/shared/empty-state'
-import { RiskScoreRing } from '@/components/investigation/risk-score-ring'
-import { ScreeningResults } from '@/components/investigation/screening-results'
-import { AiAnalysisCard } from '@/components/investigation/ai-analysis-card'
-import { formatDateTime } from '@/lib/utils/formatting'
+import type { Tables } from '@/types/database'
+import {
+  InvestigationWorkspace,
+  type InvestigationWorkspaceData,
+} from '@/components/investigation/investigation-workspace'
 
-const OwnershipGraph = dynamic(
-  () =>
-    import('@/components/graph/ownership-graph').then(
-      (mod) => mod.OwnershipGraph
-    ),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="h-[600px] w-full rounded-lg" />,
-  }
-)
+export const instant = false
 
-type Investigation = {
-  id: string
-  status: string
-  risk_score: number | null
-  assigned_to: string | null
-  summary: string | null
-  created_at: string
-  updated_at: string
-  entity: {
-    id: string
-    name: string
-    type: string
-    jurisdiction: string | null
-    registration_number: string | null
-  }
-  screening_results: Array<{
-    id: string
-    type: string
-    status: string
-    hit_count: number
-  }>
-  timeline_events: Array<{
-    id: string
-    event_type: string
-    title: string
-    description: string | null
-    created_at: string
-  }>
-}
+type PageParams = { params: Promise<{ id: string }> }
 
-const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-accent-blue/20 text-accent-blue',
-  pending_review: 'bg-risk-medium/20 text-risk-medium',
-  completed: 'bg-risk-low/20 text-risk-low',
-  escalated: 'bg-risk-critical/20 text-risk-critical',
-  archived: 'bg-muted text-muted-foreground',
-}
+export default async function InvestigationWorkspacePage({
+  params,
+}: PageParams) {
+  await connection()
+  const { id } = await params
 
-export default function InvestigationWorkspacePage() {
-  const params = useParams<{ id: string }>()
-  const [investigation, setInvestigation] = useState<Investigation | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const user = await getUser()
+  if (!user) redirect('/login')
 
-  const fetchInvestigation = useCallback(async () => {
-    const res = await fetch(`/api/investigations/${params.id}`)
-    if (res.ok) {
-      const json = await res.json()
-      setInvestigation(json.data)
-    }
-    setIsLoading(false)
-  }, [params.id])
+  const supabase = createAdminClient()
 
-  useEffect(() => {
-    fetchInvestigation()
-  }, [fetchInvestigation])
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-96" />
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-        </div>
-      </div>
-    )
-  }
+  // Admin client bypasses RLS, so we scope ownership explicitly by org.
+  const { data: investigation } = await supabase
+    .from('investigations')
+    .select('*')
+    .eq('id', id)
+    .eq('org_id', user.orgId)
+    .single()
 
   if (!investigation) {
     return (
@@ -116,164 +41,124 @@ export default function InvestigationWorkspacePage() {
     )
   }
 
-  const entity = investigation.entity
+  // Fetch parent investigation + entity name for the linked-investigation badge.
+  let parentEntity: { id: string; name: string } | null = null
+  if (investigation.parent_investigation_id) {
+    const { data: parentInv } = await supabase
+      .from('investigations')
+      .select('id, entity_id')
+      .eq('id', investigation.parent_investigation_id)
+      .single()
+    if (parentInv) {
+      const { data: pe } = await supabase
+        .from('entities')
+        .select('id, name')
+        .eq('id', parentInv.entity_id)
+        .single()
+      if (pe) parentEntity = pe
+    }
+  }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">
-              {entity.name}
-            </h1>
-            <Badge
-              variant="secondary"
-              className={STATUS_COLORS[investigation.status] ?? ''}
-            >
-              {investigation.status.replace('_', ' ')}
-            </Badge>
-          </div>
-          <p className="text-muted-foreground">
-            {entity.type} &middot;{' '}
-            {entity.jurisdiction ?? 'No jurisdiction'} &middot; Created{' '}
-            {formatDateTime(investigation.created_at)}
-          </p>
-        </div>
-        {investigation.risk_score != null && (
-          <RiskScoreRing score={investigation.risk_score} size="lg" />
-        )}
-      </div>
+  // Fetch override user name if the investigation has been overridden
+  let overrideByName: string | null = null
+  if (investigation.override_by) {
+    const { data: overrideUser } = await supabase
+      .from('users')
+      .select('full_name')
+      .eq('id', investigation.override_by)
+      .single()
+    overrideByName = overrideUser?.full_name ?? null
+  }
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">
-            <Building2 className="mr-1.5 h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="screening">
-            <ShieldCheck className="mr-1.5 h-4 w-4" />
-            Screening
-          </TabsTrigger>
-          <TabsTrigger value="documents">
-            <FileText className="mr-1.5 h-4 w-4" />
-            Documents
-          </TabsTrigger>
-          <TabsTrigger value="ownership">
-            <GitBranch className="mr-1.5 h-4 w-4" />
-            Ownership
-          </TabsTrigger>
-          <TabsTrigger value="timeline">
-            <Clock className="mr-1.5 h-4 w-4" />
-            Timeline
-          </TabsTrigger>
-          <TabsTrigger value="notes">
-            <MessageSquare className="mr-1.5 h-4 w-4" />
-            Notes
-          </TabsTrigger>
-        </TabsList>
+  const [entityRes, screeningRes, timelineRes] = await Promise.all([
+    supabase
+      .from('entities')
+      .select('*')
+      .eq('id', investigation.entity_id)
+      .single(),
+    supabase
+      .from('screening_results')
+      .select('*')
+      .eq('investigation_id', id)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('timeline_events')
+      .select('*')
+      .eq('investigation_id', id)
+      .order('created_at', { ascending: false }),
+  ])
 
-        <TabsContent value="overview" className="mt-6 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <CardTitle className="text-base">Entity Summary</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Name</span>
-                  <span className="font-medium">{entity.name}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Type</span>
-                  <span className="capitalize">{entity.type}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Jurisdiction</span>
-                  <span>{entity.jurisdiction ?? '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Registration No.</span>
-                  <span>{entity.registration_number ?? '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Risk Score</span>
-                  <span>{investigation.risk_score ?? 'Not scored'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Created</span>
-                  <span>{formatDateTime(investigation.created_at)}</span>
-                </div>
-              </CardContent>
-            </Card>
+  const screeningResults = screeningRes.data ?? []
 
-            <AiAnalysisCard
-              investigationId={investigation.id}
-              hasScreeningResults={investigation.screening_results.length > 0}
-            />
-          </div>
-        </TabsContent>
+  // Attach hits to each result in a single query (grouped by result_id).
+  const resultIds = screeningResults.map((r) => r.id)
+  let hits: Tables<'screening_hits'>[] = []
+  if (resultIds.length > 0) {
+    const { data } = await supabase
+      .from('screening_hits')
+      .select('*')
+      .in('result_id', resultIds)
+    hits = data ?? []
+  }
 
-        <TabsContent value="screening" className="mt-6">
-          <ScreeningResults investigationId={investigation.id} />
-        </TabsContent>
+  const hitsByResult = new Map<string, Tables<'screening_hits'>[]>()
+  for (const hit of hits) {
+    const existing = hitsByResult.get(hit.result_id) ?? []
+    existing.push(hit)
+    hitsByResult.set(hit.result_id, existing)
+  }
 
-        <TabsContent value="documents" className="mt-6">
-          <EmptyState
-            icon={FileText}
-            title="No documents uploaded"
-            description="Upload supporting documents like certificates of incorporation, ID documents, and financial statements."
-          />
-        </TabsContent>
+  const data: InvestigationWorkspaceData = {
+    id: investigation.id,
+    parent_investigation_id: investigation.parent_investigation_id ?? null,
+    parent_entity_name: parentEntity?.name ?? null,
+    status: investigation.status,
+    risk_score: investigation.risk_score,
+    override_risk_score: investigation.override_risk_score ?? null,
+    override_reason: investigation.override_reason ?? null,
+    override_by: investigation.override_by ?? null,
+    override_by_name: overrideByName,
+    override_at: investigation.override_at ?? null,
+    assigned_to: investigation.assigned_to,
+    summary: investigation.summary,
+    created_at: investigation.created_at,
+    updated_at: investigation.updated_at,
+    entity: entityRes.data
+      ? {
+          id: entityRes.data.id,
+          name: entityRes.data.name,
+          type: entityRes.data.type,
+          jurisdiction: entityRes.data.jurisdiction,
+          registration_number: entityRes.data.registration_number,
+          counterparty_type: entityRes.data.counterparty_type ?? null,
+        }
+      : {
+          id: '',
+          name: 'Unknown entity',
+          type: 'unknown',
+          jurisdiction: null,
+          registration_number: null,
+          counterparty_type: null,
+        },
+    screening_results: screeningResults.map((r) => ({
+      id: r.id,
+      type: r.type,
+      status: r.status,
+      hit_count: r.hit_count,
+      error_message: r.error_message,
+      started_at: r.started_at,
+      completed_at: r.completed_at,
+      screening_hits: (hitsByResult.get(r.id) ?? []).map((h) => ({
+        id: h.id,
+        source: h.source,
+        match_score: h.match_score,
+        matched_name: h.matched_name,
+        data: (h.data ?? {}) as Record<string, unknown>,
+        is_confirmed: h.is_confirmed ?? false,
+      })),
+    })),
+    timeline_events: timelineRes.data ?? [],
+  }
 
-        <TabsContent value="ownership" className="mt-6">
-          <OwnershipGraph investigationId={investigation.id} />
-        </TabsContent>
-
-        <TabsContent value="timeline" className="mt-6">
-          {investigation.timeline_events.length > 0 ? (
-            <div className="space-y-4">
-              {investigation.timeline_events.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex gap-4 rounded-lg border border-border p-4"
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-medium">{event.title}</p>
-                    {event.description && (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {event.description}
-                      </p>
-                    )}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDateTime(event.created_at)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={Clock}
-              title="No timeline events"
-              description="Timeline events will appear here as the investigation progresses."
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="notes" className="mt-6">
-          <EmptyState
-            icon={MessageSquare}
-            title="No analyst notes"
-            description="Add notes to document your findings and analysis."
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
+  return <InvestigationWorkspace investigation={data} />
 }

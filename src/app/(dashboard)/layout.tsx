@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { connection } from 'next/server'
 import { getUser } from '@/lib/auth/session'
 import { NavRail } from '@/components/layout/nav-rail'
 import { TopBar } from '@/components/layout/top-bar'
@@ -12,6 +13,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  await connection()
   const user = await getUser()
   if (!user) redirect('/login')
 

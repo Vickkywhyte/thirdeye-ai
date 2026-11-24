@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createClient } from '@/lib/supabase/client'
 import { registerSchema, type RegisterInput } from '@/lib/validation/schemas'
+import { registerUser } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,38 +33,17 @@ export default function RegisterPage() {
 
   async function onSubmit(data: RegisterInput) {
     setServerError(null)
-    const supabase = createClient()
 
-    const slug = data.organisationName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '')
-
-    const { data: orgData, error: orgError } = await supabase
-      .from('organisations')
-      .insert({ name: data.organisationName, slug })
-      .select('id')
-      .single()
-
-    if (orgError) {
-      setServerError(orgError.message)
-      return
-    }
-
-    const { error: authError } = await supabase.auth.signUp({
+    const result = await registerUser({
+      fullName: data.fullName,
       email: data.email,
       password: data.password,
-      options: {
-        data: {
-          full_name: data.fullName,
-          org_id: orgData.id,
-          role: 'owner',
-        },
-      },
+      confirmPassword: data.confirmPassword,
+      organisationName: data.organisationName,
     })
 
-    if (authError) {
-      setServerError(authError.message)
+    if (!result.success) {
+      setServerError(result.error)
       return
     }
 

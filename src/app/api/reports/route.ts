@@ -11,7 +11,9 @@ import {
   apiUnauthorized,
 } from '@/lib/api/response'
 import { handleApiError } from '@/lib/api/error-handler'
-import type { ReportTemplate } from '@/types/database'
+import { buildReportData } from '@/lib/reports/builder'
+import { generateCompletion } from '@/lib/ai/provider'
+import type { ReportTemplate, Json } from '@/types/database'
 
 export async function GET(request: NextRequest) {
   try {
@@ -100,9 +102,9 @@ export async function POST(request: NextRequest) {
         investigation_id: investigationId,
         org_id: investigation.org_id,
         template: reportTemplate,
-        status: 'draft' as const,
+        status: 'in_review' as const,
         title,
-        content: { status: 'draft' } as unknown as import('@/types/database').Json,
+        content: { status: 'generating' } as unknown as Json,
         generated_by: user.id,
       })
       .select()
@@ -112,7 +114,66 @@ export async function POST(request: NextRequest) {
       return apiError('Failed to create report', 500)
     }
 
-    return apiCreated({ report })
+    // Generate LLM narrative in the same request
+    try {
+      const reportData = await buildReportData(
+        investigationId,
+        user.fullName ?? user.email ?? 'Unknown'
+      )
+
+      const screeningSummary = reportData.screeningResults
+        .map((r) => `${r.type}: ${r.status}, ${r.hit_count} hits`)
+        .join('\n')
+
+      const aiFindingsText = reportData.aiAnalysis
+        ? `AI Risk Assessment: ${reportData.aiAnalysis.overallAssessment.toUpperCase()} (${Math.round(reportData.aiAnalysis.confidenceScore * 100)}% confidence)\n\nSummary: ${reportData.aiAnalysis.summary}\n\nKey Findings:\n${reportData.aiAnalysis.keyFindings.map((f) => `- ${f}`).join('\n')}`
+        : 'No AI analysis available.'
+
+      const prompt = `You are a compliance analyst writing a formal due diligence report narrative.
+
+Entity: ${reportData.entity.name} (${reportData.entity.type})
+Jurisdiction: ${reportData.entity.jurisdiction ?? 'Unknown'}
+Registration: ${reportData.entity.registration_number ?? 'N/A'}
+Risk Score: ${reportData.investigation.risk_score ?? 'Not scored'}/100
+
+Screening Results:
+${screeningSummary}
+
+${aiFindingsText}
+
+Write a concise, professional executive summary (3–5 paragraphs) for a ${reportTemplate.replace('_', ' ')} report. Use formal compliance language. Do not use markdown formatting — plain prose only.`
+
+      const completion = await generateCompletion(prompt, {
+        maxTokens: 1024,
+        temperature: 0.2,
+        systemPrompt: 'You are a senior compliance analyst at a due diligence firm. Write formal, professional report narratives.',
+      })
+
+      await admin
+        .from('reports')
+        .update({
+          status: 'final' as const,
+          content: {
+            status: 'ready',
+            narrative: completion.text,
+            provider: completion.provider,
+            tokensUsed: completion.tokensUsed,
+            generatedAt: new Date().toISOString(),
+          } as unknown as Json,
+        })
+        .eq('id', report.id)
+    } catch {
+      // LLM generation failed — keep the report as a draft for manual use
+      await admin
+        .from('reports')
+        .update({
+          status: 'draft' as const,
+          content: { status: 'draft' } as unknown as Json,
+        })
+        .eq('id', report.id)
+    }
+
+    return apiCreated({ report: { ...report, reportId: report.id } })
   } catch (error) {
     return handleApiError(error)
   }

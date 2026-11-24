@@ -3,6 +3,7 @@ import { hasPermission } from '@/lib/auth/rbac'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { generateRiskAnalysis } from '@/lib/ai/risk-scoring'
+import { AiProviderError } from '@/lib/ai/provider'
 import {
   apiSuccess,
   apiCreated,
@@ -134,19 +135,35 @@ export async function POST(request: Request, { params }: RouteParams) {
       })
     )
 
-    const analysis = await generateRiskAnalysis(
-      {
-        id: investigation.id,
-        entity: {
-          name: entity.name,
-          type: entity.type,
-          jurisdiction: entity.jurisdiction,
-          registration_number: entity.registration_number,
+    let analysis
+    try {
+      analysis = await generateRiskAnalysis(
+        {
+          id: investigation.id,
+          entity: {
+            name: entity.name,
+            type: entity.type,
+            jurisdiction: entity.jurisdiction,
+            registration_number: entity.registration_number,
+          },
+          risk_score: investigation.risk_score,
         },
-        risk_score: investigation.risk_score,
-      },
-      resultsWithHits
-    )
+        resultsWithHits
+      )
+    } catch (err) {
+      // The LLM is an external dependency: report why it failed rather than a
+      // generic 500, so the cause is visible in the UI.
+      if (err instanceof AiProviderError) {
+        return apiError(err.message, 503, 'AI_UNAVAILABLE')
+      }
+      const message =
+        err instanceof Error ? err.message : 'AI analysis failed'
+      return apiError(
+        `AI analysis failed: ${message}`,
+        503,
+        'AI_UNAVAILABLE'
+      )
+    }
 
     await admin
       .from('investigations')

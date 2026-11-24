@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -11,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Siren,
 } from 'lucide-react'
 import { useUIStore } from '@/stores/ui-store'
 import { Button } from '@/components/ui/button'
@@ -26,6 +28,7 @@ import type { AuthUser } from '@/lib/auth/session'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Alerts', href: '/alerts', icon: Siren },
   { label: 'Investigations', href: '/investigations', icon: Search },
   { label: 'Reports', href: '/reports', icon: FileText },
   { label: 'Settings', href: '/settings', icon: Settings },
@@ -35,6 +38,16 @@ export function NavRail({ user: _user }: { user: AuthUser }) {
   const pathname = usePathname()
   const { navExpanded, toggleNav } = useUIStore()
   const prefersReducedMotion = useReducedMotion()
+  const [alertCount, setAlertCount] = useState(0)
+
+  useEffect(() => {
+    fetch('/api/alerts?limit=50')
+      .then((r) => r.ok ? r.json() : null)
+      .then((json) => {
+        if (json?.data?.total) setAlertCount(json.data.total)
+      })
+      .catch(() => {/* non-fatal */})
+  }, [pathname])
 
   const transition = prefersReducedMotion
     ? { duration: 0 }
@@ -68,6 +81,9 @@ export function NavRail({ user: _user }: { user: AuthUser }) {
         <TooltipProvider delayDuration={0}>
           {NAV_ITEMS.map((item) => {
             const isActive = pathname.startsWith(item.href)
+            const isAlerts = item.href === '/alerts'
+            const badge = isAlerts && alertCount > 0 ? alertCount : 0
+
             const linkContent = (
               <Link
                 href={item.href}
@@ -78,7 +94,14 @@ export function NavRail({ user: _user }: { user: AuthUser }) {
                     : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                 )}
               >
-                <item.icon className="h-5 w-5 shrink-0" />
+                <span className="relative shrink-0">
+                  <item.icon className="h-5 w-5" />
+                  {badge > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
+                </span>
                 {navExpanded && (
                   <motion.span
                     initial={{ opacity: 0 }}
@@ -86,9 +109,14 @@ export function NavRail({ user: _user }: { user: AuthUser }) {
                     transition={
                       prefersReducedMotion ? { duration: 0 } : undefined
                     }
-                    className="whitespace-nowrap"
+                    className="flex flex-1 items-center justify-between whitespace-nowrap"
                   >
                     {item.label}
+                    {badge > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
                   </motion.span>
                 )}
               </Link>
@@ -98,7 +126,10 @@ export function NavRail({ user: _user }: { user: AuthUser }) {
               return (
                 <Tooltip key={item.href}>
                   <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                  <TooltipContent side="right">{item.label}</TooltipContent>
+                  <TooltipContent side="right">
+                    {item.label}
+                    {badge > 0 && ` (${badge})`}
+                  </TooltipContent>
                 </Tooltip>
               )
             }

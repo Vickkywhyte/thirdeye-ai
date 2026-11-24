@@ -30,6 +30,27 @@ export const pepProvider: ScreeningProvider = {
   type: SCREENING_TYPES.PEP,
 
   async screen(entity: ScreeningEntity): Promise<ScreeningResult> {
+    const apiKey = process.env.OPENSANCTIONS_API_KEY
+
+    console.log(
+      '[pep] Starting PEP screening for:',
+      entity.name,
+      '| OPENSANCTIONS_API_KEY:',
+      apiKey ? 'present' : 'MISSING'
+    )
+
+    // Without a key the API returns 401 {"detail":"No API key provided."},
+    // so fail with something actionable instead of a bare status code.
+    if (!apiKey) {
+      return {
+        type: SCREENING_TYPES.PEP,
+        hits: [],
+        rawData: {},
+        error:
+          'OPENSANCTIONS_API_KEY is not configured — PEP screening cannot authenticate',
+      }
+    }
+
     try {
       const payload = {
         queries: {
@@ -47,7 +68,10 @@ export const pepProvider: ScreeningProvider = {
 
       const res = await fetch(OPENSANCTIONS_MATCH_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(20000),
       })
@@ -96,6 +120,7 @@ export const pepProvider: ScreeningProvider = {
           sourceUrl: `https://opensanctions.org/entities/${r.id}/`,
         }))
 
+      console.log('[pep] Completed — total results:', queryResult.total.value, 'PEP hits:', hits.length)
       return {
         type: SCREENING_TYPES.PEP,
         hits,
@@ -106,6 +131,7 @@ export const pepProvider: ScreeningProvider = {
         },
       }
     } catch (err) {
+      console.error('[pep] Failed:', err instanceof Error ? err.message : err)
       return {
         type: SCREENING_TYPES.PEP,
         hits: [],

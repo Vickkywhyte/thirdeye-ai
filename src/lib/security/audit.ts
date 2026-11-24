@@ -25,6 +25,9 @@ export const AUDIT_ACTIONS = {
   ENTITY_CREATED: 'entity.created',
   ENTITY_UPDATED: 'entity.updated',
   ENTITY_DELETED: 'entity.deleted',
+  APPLICATION_CREATED: 'application.created',
+  APPLICATION_UPDATED: 'application.updated',
+  DECISION_RECORDED: 'decision.recorded',
 } as const
 
 export async function logAuditEvent(

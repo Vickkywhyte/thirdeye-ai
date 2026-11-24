@@ -7,6 +7,8 @@ export interface GraphNode {
   registrationNumber: string | null
   isSubject: boolean
   metadata: Record<string, unknown>
+  isLinkedElsewhere?: boolean
+  linkedInvestigationCount?: number
 }
 
 export interface GraphEdge {
@@ -63,7 +65,7 @@ export function riskLevel(score: number | null): string {
 }
 
 export const DEFAULT_GRAPH_CONFIG: GraphConfig = {
-  layout: 'force',
+  layout: 'tree',
   showLabels: true,
   showPercentages: true,
   highlightRisk: true,

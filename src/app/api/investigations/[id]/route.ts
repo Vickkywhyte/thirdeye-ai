@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/auth/session'
 import { hasPermission } from '@/lib/auth/rbac'
 import { updateInvestigationSchema } from '@/lib/validation/schemas'
@@ -26,18 +27,41 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     validateUUID(id)
     const supabase = await createClient()
 
-    const { data, error } = await supabase
+    const { data: investigation, error: invError } = await supabase
       .from('investigations')
-      .select(
-        '*, entity:entities(*), screening_results(*), timeline_events(*, created_by_user:users!timeline_events_created_by_fkey(full_name))'
-      )
+      .select('*')
       .eq('id', id)
       .eq('org_id', user.orgId)
       .single()
 
-    if (error || !data) return apiNotFound('Investigation not found')
+    if (invError || !investigation) return apiNotFound('Investigation not found')
 
-    return apiSuccess(data)
+    const admin = createAdminClient()
+
+    const [entityRes, screeningRes, timelineRes] = await Promise.all([
+      admin
+        .from('entities')
+        .select('*')
+        .eq('id', investigation.entity_id)
+        .single(),
+      admin
+        .from('screening_results')
+        .select('*')
+        .eq('investigation_id', id)
+        .order('created_at', { ascending: true }),
+      admin
+        .from('timeline_events')
+        .select('*')
+        .eq('investigation_id', id)
+        .order('created_at', { ascending: false }),
+    ])
+
+    return apiSuccess({
+      ...investigation,
+      entity: entityRes.data,
+      screening_results: screeningRes.data ?? [],
+      timeline_events: timelineRes.data ?? [],
+    })
   } catch (error) {
     return handleApiError(error)
   }
