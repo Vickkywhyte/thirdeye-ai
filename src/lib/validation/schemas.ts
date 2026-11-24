@@ -142,3 +142,23 @@ export const createDecisionSchema = z.object({
   source_id: z.string().uuid('Invalid source ID').nullable().optional(),
 })
 export type CreateDecisionInput = z.infer<typeof createDecisionSchema>
+
+export const ESCALATION_STATUSES = ['open', 'resolved'] as const
+
+export const createEscalationSchema = z.object({
+  reason: z
+    .string()
+    .min(20, 'Reason must be at least 20 characters')
+    .max(5000, 'Reason is too long'),
+  assigned_to: z.string().uuid('Invalid user ID').nullable().optional(),
+  source_id: z.string().uuid('Invalid source ID').nullable().optional(),
+})
+export type CreateEscalationInput = z.infer<typeof createEscalationSchema>
+
+export const resolveEscalationSchema = z.object({
+  resolution_notes: z
+    .string()
+    .min(20, 'Resolution notes must be at least 20 characters')
+    .max(5000, 'Resolution notes are too long'),
+})
+export type ResolveEscalationInput = z.infer<typeof resolveEscalationSchema>

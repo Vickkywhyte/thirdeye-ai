@@ -30,10 +30,16 @@ import {
 } from '@/components/investigation/screening-results'
 import { AiAnalysisCard } from '@/components/investigation/ai-analysis-card'
 import { ApplicationTab } from '@/components/investigation/application-tab'
+import {
+  CreateEscalationDialog,
+  type ComplianceManager,
+} from '@/components/investigation/create-escalation-dialog'
 import { DocumentsTab } from '@/components/investigation/documents-tab'
 import { NotesTab } from '@/components/investigation/notes-tab'
 import { RiskOverrideDialog } from '@/components/investigation/risk-override-dialog'
 import { ClientDate } from '@/components/shared/client-date'
+import { hasPermission } from '@/lib/auth/rbac'
+import type { UserRole } from '@/types/database'
 
 const RISK_WEIGHTS: Record<string, number> = {
   sanctions: 0.4,
@@ -126,14 +132,19 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function InvestigationWorkspace({
   investigation,
+  userRole,
+  complianceManagers,
 }: {
   investigation: InvestigationWorkspaceData
+  userRole: UserRole
+  complianceManagers: ComplianceManager[]
 }) {
   const entity = investigation.entity
   const screeningResults = investigation.screening_results ?? []
   const timelineEvents = investigation.timeline_events ?? []
 
   const scoreBreakdown = computeScoreBreakdown(screeningResults)
+  const canEscalate = hasPermission(userRole, 'escalations:create')
 
   return (
     <div className="space-y-6">
@@ -173,7 +184,15 @@ export function InvestigationWorkspace({
               breakdown={scoreBreakdown.length > 0 ? scoreBreakdown : undefined}
             />
           )}
-          <RiskOverrideDialog investigationId={investigation.id} />
+          <div className="flex items-center gap-2">
+            {canEscalate && (
+              <CreateEscalationDialog
+                investigationId={investigation.id}
+                complianceManagers={complianceManagers}
+              />
+            )}
+            <RiskOverrideDialog investigationId={investigation.id} />
+          </div>
         </div>
       </div>
 

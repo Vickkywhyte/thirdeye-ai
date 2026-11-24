@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Search,
   FileText,
+  Flag,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -25,16 +26,30 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import type { AuthUser } from '@/lib/auth/session'
+import { hasPermission } from '@/lib/auth/rbac'
 
-const NAV_ITEMS = [
+type NavItem = {
+  label: string
+  href: string
+  icon: typeof LayoutDashboard
+  gate?: (user: AuthUser) => boolean
+}
+
+const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Alerts', href: '/alerts', icon: Siren },
   { label: 'Investigations', href: '/investigations', icon: Search },
+  {
+    label: 'Escalations',
+    href: '/escalations',
+    icon: Flag,
+    gate: (u) => hasPermission(u.role, 'escalations:resolve'),
+  },
   { label: 'Reports', href: '/reports', icon: FileText },
   { label: 'Settings', href: '/settings', icon: Settings },
-] as const
+]
 
-export function NavRail({ user: _user }: { user: AuthUser }) {
+export function NavRail({ user }: { user: AuthUser }) {
   const pathname = usePathname()
   const { navExpanded, toggleNav } = useUIStore()
   const prefersReducedMotion = useReducedMotion()
@@ -79,7 +94,7 @@ export function NavRail({ user: _user }: { user: AuthUser }) {
 
       <nav className="flex-1 space-y-1 p-2">
         <TooltipProvider delayDuration={0}>
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => !item.gate || item.gate(user)).map((item) => {
             const isActive = pathname.startsWith(item.href)
             const isAlerts = item.href === '/alerts'
             const badge = isAlerts && alertCount > 0 ? alertCount : 0

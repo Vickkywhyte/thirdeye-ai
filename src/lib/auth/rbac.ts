@@ -40,6 +40,8 @@ export type Permission =
   | 'applications:update'
   | 'decisions:read'
   | 'decisions:create'
+  | 'escalations:create'
+  | 'escalations:resolve'
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   owner: [
@@ -56,6 +58,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'settings:read', 'settings:update',
     'applications:read', 'applications:create', 'applications:update',
     'decisions:read', 'decisions:create',
+    'escalations:create', 'escalations:resolve',
   ],
   admin: [
     'investigations:read', 'investigations:create', 'investigations:update', 'investigations:delete',
@@ -71,6 +74,22 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'settings:read', 'settings:update',
     'applications:read', 'applications:create', 'applications:update',
     'decisions:read', 'decisions:create',
+    'escalations:create', 'escalations:resolve',
+  ],
+  compliance_manager: [
+    'investigations:read', 'investigations:create', 'investigations:update',
+    'entities:read', 'entities:create', 'entities:update',
+    'screening:run', 'screening:review',
+    'reports:read', 'reports:create', 'reports:update', 'reports:approve',
+    'documents:read', 'documents:upload',
+    'notes:read', 'notes:create', 'notes:update',
+    'users:read',
+    'org:read',
+    'audit_log:read',
+    'settings:read',
+    'applications:read', 'applications:create', 'applications:update',
+    'decisions:read', 'decisions:create',
+    'escalations:create', 'escalations:resolve',
   ],
   analyst: [
     'investigations:read', 'investigations:create', 'investigations:update',
@@ -85,6 +104,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'settings:read',
     'applications:read', 'applications:create', 'applications:update',
     'decisions:read', 'decisions:create',
+    'escalations:create',
   ],
   viewer: [
     'investigations:read',
@@ -109,8 +129,9 @@ export function getPermissions(role: UserRole): readonly Permission[] {
 }
 
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
-  owner: 4,
-  admin: 3,
+  owner: 5,
+  admin: 4,
+  compliance_manager: 3,
   analyst: 2,
   viewer: 1,
 }

@@ -425,6 +425,87 @@ export type Database = {
           },
         ]
       }
+      escalations: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          escalated_by: string
+          id: string
+          investigation_id: string
+          org_id: string
+          reason: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          source_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          escalated_by: string
+          id?: string
+          investigation_id: string
+          org_id: string
+          reason: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          source_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          escalated_by?: string
+          id?: string
+          investigation_id?: string
+          org_id?: string
+          reason?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          source_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalations_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalations_escalated_by_fkey"
+            columns: ["escalated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalations_investigation_id_fkey"
+            columns: ["investigation_id"]
+            isOneToOne: false
+            referencedRelation: "investigations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalations_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investigations: {
         Row: {
           assigned_to: string | null
@@ -1024,7 +1105,7 @@ export type Database = {
         | "periodic_review"
       screening_status: "pending" | "running" | "completed" | "failed"
       screening_type: "sanctions" | "pep" | "adverse_media" | "registry"
-      user_role: "owner" | "admin" | "analyst" | "viewer"
+      user_role: "owner" | "admin" | "compliance_manager" | "analyst" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1179,7 +1260,7 @@ export const Constants = {
       ],
       screening_status: ["pending", "running", "completed", "failed"],
       screening_type: ["sanctions", "pep", "adverse_media", "registry"],
-      user_role: ["owner", "admin", "analyst", "viewer"],
+      user_role: ["owner", "admin", "compliance_manager", "analyst", "viewer"],
     },
   },
 } as const

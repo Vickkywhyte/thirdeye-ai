@@ -70,6 +70,16 @@ export default async function InvestigationWorkspacePage({
     overrideByName = overrideUser?.full_name ?? null
   }
 
+  const { data: complianceManagersData } = await supabase
+    .from('users')
+    .select('id, full_name')
+    .eq('org_id', user.orgId)
+    .eq('role', 'compliance_manager')
+    .eq('is_active', true)
+    .order('full_name', { ascending: true })
+
+  const complianceManagers = complianceManagersData ?? []
+
   const [entityRes, screeningRes, timelineRes] = await Promise.all([
     supabase
       .from('entities')
@@ -160,5 +170,11 @@ export default async function InvestigationWorkspacePage({
     timeline_events: timelineRes.data ?? [],
   }
 
-  return <InvestigationWorkspace investigation={data} />
+  return (
+    <InvestigationWorkspace
+      investigation={data}
+      userRole={user.role}
+      complianceManagers={complianceManagers}
+    />
+  )
 }
