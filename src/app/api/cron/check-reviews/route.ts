@@ -5,8 +5,6 @@ import { handleApiError } from '@/lib/api/error-handler'
 import { AUDIT_ACTIONS } from '@/lib/security/audit'
 import type { Json } from '@/types/database'
 
-export const dynamic = 'force-dynamic'
-
 /**
  * Authenticate the request against CRON_SECRET.
  * Accepts either `Authorization: Bearer <secret>` (Vercel Cron) or `?secret=<secret>`.
