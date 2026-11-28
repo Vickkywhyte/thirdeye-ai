@@ -25,9 +25,11 @@ import {
   DispositionBadge,
   ReviewHitDialog,
 } from '@/components/investigation/review-hit-dialog'
+import { ClientDate } from '@/components/shared/client-date'
 import { hasPermission } from '@/lib/auth/rbac'
 import type { UserRole } from '@/types/database'
 import type { HitDisposition } from '@/lib/validation/schemas'
+import { RefreshCw } from 'lucide-react'
 
 interface ScreeningHit {
   id: string
@@ -48,6 +50,8 @@ export interface ScreeningResult {
   error_message?: string | null
   started_at?: string | null
   completed_at?: string | null
+  last_updated_at?: string | null
+  retry_count?: number
   screening_hits?: ScreeningHit[]
 }
 
@@ -255,7 +259,7 @@ export function ScreeningResults({
     return () => clearInterval(interval)
   }, [isScreeningInFlight, router])
 
-  async function runScreening() {
+  async function runScreening(onlyTypes?: string[]) {
     setTriggering(true)
     setTriggerError(null)
     try {
@@ -264,7 +268,10 @@ export function ScreeningResults({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           investigation_id: investigationId,
-          types: ['sanctions', 'pep', 'adverse_media', 'registry'],
+          types:
+            onlyTypes && onlyTypes.length > 0
+              ? onlyTypes
+              : ['sanctions', 'pep', 'adverse_media', 'registry'],
         }),
       })
       if (!res.ok) {
@@ -292,7 +299,7 @@ export function ScreeningResults({
           <p className="mt-2 text-sm text-red-400">{triggerError}</p>
         )}
         <Button
-          onClick={runScreening}
+          onClick={() => runScreening()}
           disabled={triggering}
           className="mt-4"
           size="lg"
@@ -317,7 +324,7 @@ export function ScreeningResults({
     <div className="space-y-4">
       <div className="flex items-center justify-end">
         <Button
-          onClick={runScreening}
+          onClick={() => runScreening()}
           disabled={triggering}
           variant="outline"
           size="sm"
@@ -362,6 +369,21 @@ export function ScreeningResults({
                     <span className="text-sm font-medium text-zinc-200">
                       {config.label}
                     </span>
+                    {result.status === 'completed' && result.last_updated_at && (
+                      <span className="text-xs text-muted-foreground">
+                        Updated{' '}
+                        <ClientDate
+                          date={result.last_updated_at}
+                          variant="relative"
+                        />
+                      </span>
+                    )}
+                    {typeof result.retry_count === 'number' &&
+                      result.retry_count > 0 && (
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Retry {result.retry_count}
+                        </span>
+                      )}
                   </div>
                   <div className="flex items-center gap-2">
                     {isRegistry ? (
@@ -381,10 +403,38 @@ export function ScreeningResults({
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                {result.error_message && (
-                  <p className="mb-3 text-xs text-red-400">
-                    Error: {result.error_message}
-                  </p>
+                {result.status === 'failed' ? (
+                  <div className="mb-3 flex items-start justify-between gap-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-red-300">
+                        {config.label} check failed
+                      </p>
+                      <p className="mt-0.5 text-xs text-red-300/80">
+                        {result.error_message ??
+                          'The provider did not return a successful response.'}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={triggering}
+                      onClick={() => runScreening([result.type])}
+                      className="shrink-0 gap-1.5 border-red-500/40 text-red-300 hover:bg-red-500/10"
+                    >
+                      {triggering ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                      Retry Check
+                    </Button>
+                  </div>
+                ) : (
+                  result.error_message && (
+                    <p className="mb-3 text-xs text-red-400">
+                      Error: {result.error_message}
+                    </p>
+                  )
                 )}
                 {isRegistry ? (
                   hits.length === 0 ? (

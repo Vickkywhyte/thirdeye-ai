@@ -75,6 +75,24 @@ export async function POST(request: NextRequest) {
     }
 
     for (const type of screeningTypes) {
+      // Durable retry: look up any existing row so we can advance the
+      // retry_count instead of just zeroing the state on re-trigger.
+      // A row in a previously-failed state becomes retry_count + 1;
+      // a fresh row starts at 0.
+      const { data: existingRow } = await supabase
+        .from('screening_results')
+        .select('id, retry_count, status')
+        .eq('investigation_id', investigation_id)
+        .eq('type', type as 'sanctions' | 'pep' | 'adverse_media' | 'registry')
+        .maybeSingle()
+
+      const nextRetryCount =
+        existingRow && existingRow.status === 'failed'
+          ? (existingRow.retry_count ?? 0) + 1
+          : existingRow?.retry_count ?? 0
+
+      const nowReset = new Date().toISOString()
+
       const { error: upsertError } = await supabase
         .from('screening_results')
         .upsert(
@@ -87,6 +105,8 @@ export async function POST(request: NextRequest) {
             error_message: null,
             started_at: null,
             completed_at: null,
+            retry_count: nextRetryCount,
+            last_updated_at: nowReset,
           },
           { onConflict: 'investigation_id,type' }
         )
@@ -97,6 +117,16 @@ export async function POST(request: NextRequest) {
           500,
           'DB_ERROR'
         )
+      }
+
+      // When we're resetting a previously-failed row, also wipe the hits
+      // from the prior attempt so the UI doesn't display stale evidence
+      // alongside a freshly-pending status.
+      if (existingRow && existingRow.status === 'failed') {
+        await supabase
+          .from('screening_hits')
+          .delete()
+          .eq('result_id', existingRow.id)
       }
     }
 

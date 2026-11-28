@@ -158,6 +158,8 @@ export default async function InvestigationWorkspacePage({
       error_message: r.error_message,
       started_at: r.started_at,
       completed_at: r.completed_at,
+      last_updated_at: r.last_updated_at,
+      retry_count: r.retry_count ?? 0,
       screening_hits: (hitsByResult.get(r.id) ?? []).map((h) => ({
         id: h.id,
         source: h.source,

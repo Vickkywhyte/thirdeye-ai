@@ -1028,7 +1028,9 @@ export type Database = {
           hit_count: number
           id: string
           investigation_id: string
+          last_updated_at: string
           raw_data: Json
+          retry_count: number
           started_at: string | null
           status: Database["public"]["Enums"]["screening_status"]
           type: Database["public"]["Enums"]["screening_type"]
@@ -1041,7 +1043,9 @@ export type Database = {
           hit_count?: number
           id?: string
           investigation_id: string
+          last_updated_at?: string
           raw_data?: Json
+          retry_count?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["screening_status"]
           type: Database["public"]["Enums"]["screening_type"]
@@ -1054,7 +1058,9 @@ export type Database = {
           hit_count?: number
           id?: string
           investigation_id?: string
+          last_updated_at?: string
           raw_data?: Json
+          retry_count?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["screening_status"]
           type?: Database["public"]["Enums"]["screening_type"]

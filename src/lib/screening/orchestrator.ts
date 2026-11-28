@@ -108,11 +108,13 @@ export async function runScreening(
 
     const resultId = resultRow.id
 
+    const nowRunning = new Date().toISOString()
     const { error: runningErr } = await supabase
       .from('screening_results')
       .update({
         status: 'running' as const,
-        started_at: new Date().toISOString(),
+        started_at: nowRunning,
+        last_updated_at: nowRunning,
       })
       .eq('id', resultId)
 
@@ -129,6 +131,7 @@ export async function runScreening(
       const result = await provider.screen(entity)
       logger.info(`Provider ${type} finished`, { hits: result.hits.length, error: result.error ?? null })
 
+      const nowCompleted = new Date().toISOString()
       const { error: updateErr } = await supabase
         .from('screening_results')
         .update({
@@ -136,7 +139,8 @@ export async function runScreening(
           hit_count: result.hits.length,
           raw_data: result.rawData as import('@/types/database').Json,
           error_message: result.error ?? null,
-          completed_at: new Date().toISOString(),
+          completed_at: nowCompleted,
+          last_updated_at: nowCompleted,
         })
         .eq('id', resultId)
 
@@ -197,15 +201,26 @@ export async function runScreening(
 
       return result
     } catch (err) {
+      // A provider that throws must not take down its siblings. We mark
+      // just this row 'failed' with the error captured, and the outer
+      // Promise.all still awaits every other provider.
       const errorMsg =
         err instanceof Error ? err.message : 'Screening failed'
 
+      logger.error(`Provider ${type} threw — isolating failure`, {
+        investigationId,
+        resultId,
+        error: errorMsg,
+      })
+
+      const nowFailed = new Date().toISOString()
       await supabase
         .from('screening_results')
         .update({
           status: 'failed' as const,
           error_message: errorMsg,
-          completed_at: new Date().toISOString(),
+          completed_at: nowFailed,
+          last_updated_at: nowFailed,
         })
         .eq('id', resultId)
 
