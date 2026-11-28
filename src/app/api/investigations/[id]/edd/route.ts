@@ -93,6 +93,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const completing =
       parsed.data.status === 'completed' && existing?.status !== 'completed'
 
+    // Provenance (D1): a source is required on completion. The Zod refine
+    // already enforces presence; here we verify the cited source belongs
+    // to the caller's org so the FK can't attribute completion to someone
+    // else's record.
+    if (parsed.data.source_id) {
+      const { data: source, error: sourceError } = await supabase
+        .from('sources')
+        .select('id')
+        .eq('id', parsed.data.source_id)
+        .eq('org_id', user.orgId)
+        .maybeSingle()
+
+      if (sourceError) return apiError(sourceError.message, 500, 'DB_ERROR')
+      if (!source) {
+        return apiError(
+          'Source not found in this organisation',
+          400,
+          'INVALID_SOURCE'
+        )
+      }
+    }
+
     const payload = {
       org_id: user.orgId,
       investigation_id: investigationId,

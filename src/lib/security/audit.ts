@@ -36,6 +36,7 @@ export const AUDIT_ACTIONS = {
   REVIEW_COMPLETED: 'review.completed',
   REVIEW_MARKED_OVERDUE: 'review.marked_overdue',
   HIT_REVIEWED: 'hit.reviewed',
+  SOURCE_CREATED: 'source.created',
 } as const
 
 export async function logAuditEvent(

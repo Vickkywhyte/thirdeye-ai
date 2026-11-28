@@ -317,6 +317,7 @@ export function InvestigationWorkspace({
           <ScreeningResults
             investigationId={investigation.id}
             initialResults={screeningResults}
+            userRole={userRole}
           />
         </TabsContent>
 

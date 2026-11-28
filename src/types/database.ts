@@ -1072,6 +1072,7 @@ export type Database = {
       }
       sources: {
         Row: {
+          authority_tier: string
           content_hash: string | null
           created_at: string
           id: string
@@ -1084,6 +1085,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          authority_tier?: string
           content_hash?: string | null
           created_at?: string
           id?: string
@@ -1096,6 +1098,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          authority_tier?: string
           content_hash?: string | null
           created_at?: string
           id?: string

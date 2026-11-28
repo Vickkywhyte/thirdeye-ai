@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { DECISION_TYPES } from '@/lib/validation/schemas'
+import { SourcePicker } from '@/components/sources/source-picker'
 
 type DecisionType = (typeof DECISION_TYPES)[number]
 
@@ -65,14 +66,17 @@ export function RecordDecisionDialog({ applicationId, onRecorded }: Props) {
   const [open, setOpen] = useState(false)
   const [decisionType, setDecisionType] = useState<DecisionType | ''>('')
   const [rationale, setRationale] = useState('')
+  const [sourceId, setSourceId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const rationaleValid = rationale.trim().length >= 20
+  const sourceValid = !!sourceId
 
   function reset() {
     setDecisionType('')
     setRationale('')
+    setSourceId(null)
     setError(null)
   }
 
@@ -90,6 +94,10 @@ export function RecordDecisionDialog({ applicationId, onRecorded }: Props) {
       setError('Rationale must be at least 20 characters.')
       return
     }
+    if (!sourceValid) {
+      setError('Pick a source for provenance.')
+      return
+    }
 
     setSubmitting(true)
     setError(null)
@@ -103,6 +111,7 @@ export function RecordDecisionDialog({ applicationId, onRecorded }: Props) {
           body: JSON.stringify({
             decision_type: decisionType,
             rationale,
+            source_id: sourceId,
           }),
         }
       )
@@ -207,6 +216,19 @@ export function RecordDecisionDialog({ applicationId, onRecorded }: Props) {
             </p>
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="decision-source">
+              Evidence Source
+              <span className="ml-1 text-xs text-destructive">*</span>
+            </Label>
+            <SourcePicker
+              id="decision-source"
+              value={sourceId}
+              onChange={setSourceId}
+              required
+            />
+          </div>
+
           {error && (
             <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {error}
@@ -224,7 +246,7 @@ export function RecordDecisionDialog({ applicationId, onRecorded }: Props) {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !decisionType || !rationaleValid}
+            disabled={submitting || !decisionType || !rationaleValid || !sourceValid}
           >
             {submitting && (
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />

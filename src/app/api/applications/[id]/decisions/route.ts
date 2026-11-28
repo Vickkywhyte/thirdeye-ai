@@ -80,6 +80,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (appError) return apiError(appError.message, 500, 'DB_ERROR')
     if (!application) return apiNotFound('Application not found')
 
+    // Provenance (D1): verify the cited source belongs to the caller's org
+    // before trusting its FK. RLS would block cross-tenant reads, but the
+    // FK insert itself would otherwise succeed and attribute the decision
+    // to someone else's record.
+    const { data: source, error: sourceError } = await supabase
+      .from('sources')
+      .select('id')
+      .eq('id', parsed.data.source_id)
+      .eq('org_id', user.orgId)
+      .maybeSingle()
+
+    if (sourceError) return apiError(sourceError.message, 500, 'DB_ERROR')
+    if (!source) {
+      return apiError(
+        'Source not found in this organisation',
+        400,
+        'INVALID_SOURCE'
+      )
+    }
+
     const { data: decision, error } = await supabase
       .from('decisions')
       .insert({
@@ -88,7 +108,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         decision_type: parsed.data.decision_type,
         rationale: parsed.data.rationale,
         decided_by: user.id,
-        source_id: parsed.data.source_id ?? null,
+        source_id: parsed.data.source_id,
       })
       .select()
       .single()

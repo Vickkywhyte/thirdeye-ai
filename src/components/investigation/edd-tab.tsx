@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ClientDate } from '@/components/shared/client-date'
+import { SourcePicker } from '@/components/sources/source-picker'
 import { cn } from '@/lib/utils'
 import {
   EDD_RISK_LEVELS,
@@ -45,6 +46,7 @@ type EddAssessment = {
   notes: string | null
   completed_by: string | null
   completed_at: string | null
+  source_id: string | null
   created_at: string
   updated_at: string
 }
@@ -112,6 +114,7 @@ export function EddTab({
   const [error, setError] = useState<string | null>(null)
   const [riskFactors, setRiskFactors] = useState<Record<string, RiskLevel>>({})
   const [notes, setNotes] = useState('')
+  const [sourceId, setSourceId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/investigations/${investigationId}/edd`)
@@ -131,6 +134,7 @@ export function EddTab({
         setAssessment(next)
         setRiskFactors(next?.risk_factors ?? {})
         setNotes(next?.notes ?? '')
+        setSourceId(next?.source_id ?? null)
         setError(null)
       })
       .catch((err: unknown) => {
@@ -166,6 +170,7 @@ export function EddTab({
       setAssessment(next)
       setRiskFactors(next?.risk_factors ?? {})
       setNotes(next?.notes ?? '')
+      setSourceId(next?.source_id ?? null)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh')
@@ -180,6 +185,7 @@ export function EddTab({
       setAssessment(next)
       setRiskFactors(next.risk_factors ?? {})
       setNotes(next.notes ?? '')
+      setSourceId(next.source_id ?? null)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start EDD')
@@ -197,6 +203,7 @@ export function EddTab({
         status: 'draft',
         risk_factors: riskFactors,
         notes: notes.trim() ? notes : null,
+        source_id: sourceId,
       })
       setAssessment(next)
     } catch (err) {
@@ -208,6 +215,10 @@ export function EddTab({
 
   async function markCompleted() {
     if (!assessment) return
+    if (!sourceId) {
+      setError('A source is required to complete the assessment.')
+      return
+    }
     setCompleting(true)
     setError(null)
     try {
@@ -215,6 +226,7 @@ export function EddTab({
         status: 'completed',
         risk_factors: riskFactors,
         notes: notes.trim() ? notes : null,
+        source_id: sourceId,
       })
       setAssessment(next)
       router.refresh()
@@ -358,6 +370,22 @@ export function EddTab({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="edd-source" className="text-sm font-medium">
+              Evidence Source
+              <span className="ml-1 text-xs text-destructive">
+                * required on completion
+              </span>
+            </Label>
+            <SourcePicker
+              id="edd-source"
+              value={sourceId}
+              onChange={setSourceId}
+              disabled={readOnly}
+              required={!readOnly}
+            />
+          </div>
+
+          <div className="space-y-2">
             <h3 className="text-sm font-medium">Supporting Documents</h3>
             <div className="flex items-center justify-between rounded-md border border-dashed border-border p-3">
               <p className="text-xs text-muted-foreground">
@@ -394,8 +422,9 @@ export function EddTab({
               </Button>
               <Button
                 onClick={markCompleted}
-                disabled={saving || completing}
+                disabled={saving || completing || !sourceId}
                 className="gap-1.5"
+                title={!sourceId ? 'Pick a source first' : undefined}
               >
                 {completing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

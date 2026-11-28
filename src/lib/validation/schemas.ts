@@ -139,7 +139,9 @@ export const createDecisionSchema = z.object({
     .string()
     .min(20, 'Rationale must be at least 20 characters')
     .max(5000, 'Rationale is too long'),
-  source_id: z.string().uuid('Invalid source ID').nullable().optional(),
+  source_id: z
+    .string()
+    .uuid('A source is required for provenance'),
 })
 export type CreateDecisionInput = z.infer<typeof createDecisionSchema>
 
@@ -170,12 +172,17 @@ const riskFactorsSchema = z
   .record(z.string(), z.enum(EDD_RISK_LEVELS))
   .default({})
 
-export const upsertEddSchema = z.object({
-  status: z.enum(EDD_STATUSES).default('draft'),
-  risk_factors: riskFactorsSchema,
-  notes: z.string().max(10000, 'Notes are too long').nullable().optional(),
-  source_id: z.string().uuid('Invalid source ID').nullable().optional(),
-})
+export const upsertEddSchema = z
+  .object({
+    status: z.enum(EDD_STATUSES).default('draft'),
+    risk_factors: riskFactorsSchema,
+    notes: z.string().max(10000, 'Notes are too long').nullable().optional(),
+    source_id: z.string().uuid('Invalid source ID').nullable().optional(),
+  })
+  .refine((v) => v.status !== 'completed' || !!v.source_id, {
+    message: 'A source is required when completing an EDD assessment',
+    path: ['source_id'],
+  })
 export type UpsertEddInput = z.infer<typeof upsertEddSchema>
 
 export const updateEddSchema = z.object({
@@ -249,3 +256,31 @@ export const reviewScreeningHitSchema = z.object({
     .max(5000, 'Rationale is too long'),
 })
 export type ReviewScreeningHitInput = z.infer<typeof reviewScreeningHitSchema>
+
+export const SOURCE_TYPES = [
+  'registry',
+  'sanctions',
+  'pep',
+  'media',
+  'llm',
+  'manual',
+] as const
+export type SourceType = (typeof SOURCE_TYPES)[number]
+
+export const AUTHORITY_TIERS = ['tier_1', 'tier_2', 'tier_3'] as const
+export type AuthorityTier = (typeof AUTHORITY_TIERS)[number]
+
+export const createSourceSchema = z.object({
+  source_type: z.enum(SOURCE_TYPES),
+  source_name: z
+    .string()
+    .min(1, 'Source name is required')
+    .max(500, 'Source name is too long'),
+  source_url: z
+    .string()
+    .url('source_url must be a valid URL')
+    .nullable()
+    .optional(),
+  authority_tier: z.enum(AUTHORITY_TIERS).default('tier_3'),
+})
+export type CreateSourceInput = z.infer<typeof createSourceSchema>

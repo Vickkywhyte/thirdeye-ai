@@ -46,6 +46,8 @@ export type Permission =
   | 'edd:update'
   | 'reviews:read'
   | 'reviews:update'
+  | 'sources:read'
+  | 'sources:create'
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   owner: [
@@ -65,6 +67,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'escalations:create', 'escalations:resolve',
     'edd:read', 'edd:update',
     'reviews:read', 'reviews:update',
+    'sources:read', 'sources:create',
   ],
   admin: [
     'investigations:read', 'investigations:create', 'investigations:update', 'investigations:delete',
@@ -83,6 +86,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'escalations:create', 'escalations:resolve',
     'edd:read', 'edd:update',
     'reviews:read', 'reviews:update',
+    'sources:read', 'sources:create',
   ],
   compliance_manager: [
     'investigations:read', 'investigations:create', 'investigations:update',
@@ -100,6 +104,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'escalations:create', 'escalations:resolve',
     'edd:read', 'edd:update',
     'reviews:read', 'reviews:update',
+    'sources:read', 'sources:create',
   ],
   analyst: [
     'investigations:read', 'investigations:create', 'investigations:update',
@@ -117,6 +122,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'escalations:create',
     'edd:read', 'edd:update',
     'reviews:read', 'reviews:update',
+    'sources:read', 'sources:create',
   ],
   viewer: [
     'investigations:read',
@@ -131,6 +137,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'decisions:read',
     'edd:read',
     'reviews:read',
+    'sources:read',
   ],
 } as const
 

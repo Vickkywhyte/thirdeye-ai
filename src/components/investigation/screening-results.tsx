@@ -25,6 +25,8 @@ import {
   DispositionBadge,
   ReviewHitDialog,
 } from '@/components/investigation/review-hit-dialog'
+import { hasPermission } from '@/lib/auth/rbac'
+import type { UserRole } from '@/types/database'
 import type { HitDisposition } from '@/lib/validation/schemas'
 
 interface ScreeningHit {
@@ -217,15 +219,18 @@ const MAX_POLLS = 40
 export function ScreeningResults({
   investigationId,
   initialResults,
+  userRole,
 }: {
   investigationId: string
   initialResults: ScreeningResult[]
+  userRole: UserRole
 }) {
   const router = useRouter()
   const [triggering, setTriggering] = useState(false)
   const [triggerError, setTriggerError] = useState<string | null>(null)
   const pollCount = useRef(0)
 
+  const canReviewHits = hasPermission(userRole, 'screening:review')
   const results = initialResults ?? []
 
   const isScreeningInFlight = results.some(
@@ -425,12 +430,14 @@ export function ScreeningResults({
                               </p>
                             )}
                           </div>
-                          <ReviewHitDialog
-                            hitId={hit.id}
-                            currentDisposition={hit.disposition}
-                            source={hit.source}
-                            matchedName={hit.matched_name}
-                          />
+                          {canReviewHits && (
+                            <ReviewHitDialog
+                              hitId={hit.id}
+                              currentDisposition={hit.disposition}
+                              source={hit.source}
+                              matchedName={hit.matched_name}
+                            />
+                          )}
                         </div>
                       </div>
                     ))}
