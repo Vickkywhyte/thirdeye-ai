@@ -961,11 +961,13 @@ export type Database = {
         Row: {
           created_at: string
           data: Json
+          disposition: string
           id: string
           is_confirmed: boolean | null
           match_score: number
           matched_name: string | null
           result_id: string
+          review_rationale: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           source: string
@@ -974,11 +976,13 @@ export type Database = {
         Insert: {
           created_at?: string
           data?: Json
+          disposition?: string
           id?: string
           is_confirmed?: boolean | null
           match_score: number
           matched_name?: string | null
           result_id: string
+          review_rationale?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           source: string
@@ -987,11 +991,13 @@ export type Database = {
         Update: {
           created_at?: string
           data?: Json
+          disposition?: string
           id?: string
           is_confirmed?: boolean | null
           match_score?: number
           matched_name?: string | null
           result_id?: string
+          review_rationale?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           source?: string

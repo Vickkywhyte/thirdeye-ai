@@ -165,6 +165,14 @@ export default async function InvestigationWorkspacePage({
         matched_name: h.matched_name,
         data: (h.data ?? {}) as Record<string, unknown>,
         is_confirmed: h.is_confirmed ?? false,
+        disposition: (h.disposition ?? 'unreviewed') as
+          | 'unreviewed'
+          | 'confirmed'
+          | 'false_positive'
+          | 'needs_review'
+          | 'unable_to_determine'
+          | 'not_applicable',
+        review_rationale: h.review_rationale ?? null,
       })),
     })),
     timeline_events: timelineRes.data ?? [],

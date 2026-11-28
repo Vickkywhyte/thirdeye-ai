@@ -222,3 +222,30 @@ export const updateReviewSchema = z
     { message: 'Nothing to update', path: ['status'] }
   )
 export type UpdateReviewInput = z.infer<typeof updateReviewSchema>
+
+export const HIT_DISPOSITIONS = [
+  'unreviewed',
+  'confirmed',
+  'false_positive',
+  'needs_review',
+  'unable_to_determine',
+  'not_applicable',
+] as const
+export type HitDisposition = (typeof HIT_DISPOSITIONS)[number]
+
+export const REVIEWABLE_HIT_DISPOSITIONS = [
+  'confirmed',
+  'false_positive',
+  'needs_review',
+  'unable_to_determine',
+  'not_applicable',
+] as const
+
+export const reviewScreeningHitSchema = z.object({
+  disposition: z.enum(REVIEWABLE_HIT_DISPOSITIONS),
+  rationale: z
+    .string()
+    .min(20, 'Rationale must be at least 20 characters')
+    .max(5000, 'Rationale is too long'),
+})
+export type ReviewScreeningHitInput = z.infer<typeof reviewScreeningHitSchema>

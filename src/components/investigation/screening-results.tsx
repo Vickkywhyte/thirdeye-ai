@@ -21,6 +21,11 @@ import {
   XCircle,
 } from 'lucide-react'
 import { SourceEvidenceCard } from './source-evidence-card'
+import {
+  DispositionBadge,
+  ReviewHitDialog,
+} from '@/components/investigation/review-hit-dialog'
+import type { HitDisposition } from '@/lib/validation/schemas'
 
 interface ScreeningHit {
   id: string
@@ -29,6 +34,8 @@ interface ScreeningHit {
   matched_name: string | null
   data: Record<string, unknown>
   is_confirmed: boolean
+  disposition: HitDisposition
+  review_rationale: string | null
 }
 
 export interface ScreeningResult {
@@ -395,20 +402,37 @@ export function ScreeningResults({
                       : 'Awaiting results…'}
                   </p>
                 ) : (
-                  <div className="space-y-2 pb-2">
+                  <div className="space-y-3 pb-2">
                     {hits.map((hit) => (
-                      <SourceEvidenceCard
-                        key={hit.id}
-                        source={hit.source}
-                        matchScore={hit.match_score}
-                        matchedName={hit.matched_name}
-                        severity={classifyHitSeverity(hit.match_score)}
-                        data={hit.data as Record<string, unknown>}
-                        sourceUrl={
-                          (hit.data as Record<string, unknown>)
-                            .sourceUrl as string | undefined
-                        }
-                      />
+                      <div key={hit.id} className="space-y-2">
+                        <SourceEvidenceCard
+                          source={hit.source}
+                          matchScore={hit.match_score}
+                          matchedName={hit.matched_name}
+                          severity={classifyHitSeverity(hit.match_score)}
+                          data={hit.data as Record<string, unknown>}
+                          sourceUrl={
+                            (hit.data as Record<string, unknown>)
+                              .sourceUrl as string | undefined
+                          }
+                        />
+                        <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <DispositionBadge disposition={hit.disposition} />
+                            {hit.review_rationale && (
+                              <p className="truncate text-xs text-muted-foreground">
+                                {hit.review_rationale}
+                              </p>
+                            )}
+                          </div>
+                          <ReviewHitDialog
+                            hitId={hit.id}
+                            currentDisposition={hit.disposition}
+                            source={hit.source}
+                            matchedName={hit.matched_name}
+                          />
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
