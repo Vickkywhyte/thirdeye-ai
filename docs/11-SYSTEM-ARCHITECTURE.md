@@ -199,7 +199,7 @@ Each feature below maps concretely to the UI surface, API routes, and database t
 
 ## 3. Database Schema & Data Model
 
-### Tables (18 total)
+### Tables (20 total)
 
 | # | Table | Purpose |
 |---|---|---|
@@ -240,16 +240,20 @@ org_id = get_org_id_for_user(auth.uid())
 
 ### Migrations
 
-12 migrations are committed and applied on the remote (`kbhlnzxhjzhmwprxgbcn`). On the remote, 5 of them are tracked under timestamp versions (Phase A tail) and 7 under numbered versions — a harmless convention split that `supabase migration list` confirms.
+15 migrations are committed and applied on the remote (`kbhlnzxhjzhmwprxgbcn`). On the remote, 5 of them are tracked under timestamp versions (Phase A tail) and 10 under numbered versions — a harmless convention split that `supabase migration list` confirms.
 
 ```
-00001_initial_schema.sql           00007_risk_override.sql
-00002_rls_policies.sql             00008_phase_b_core.sql
-00003_functions.sql                00009_phase_a_schema_catchup.sql
-00004_fix_trigger.sql              00010_phase_c_escalations.sql
-00005_screening_results_unique.sql 00011_phase_d_edd_assessments.sql
-00006_parent_investigation.sql     00012_phase_e_reviews.sql
+00001_initial_schema.sql           00009_phase_a_schema_catchup.sql
+00002_rls_policies.sql             00010_phase_c_escalations.sql
+00003_functions.sql                00011_phase_d_edd_assessments.sql
+00004_fix_trigger.sql              00012_phase_e_reviews.sql
+00005_screening_results_unique.sql 00013_screening_hit_disposition.sql
+00006_parent_investigation.sql     00014_sources_authority_tier.sql
+00007_risk_override.sql            00015_screening_reliability.sql
+00008_phase_b_core.sql
 ```
+
+Migrations 00013–00015 belong to the **Product Hardening** phase: hit review workflow (B), evidence provenance (C), and screening durability (D) respectively.
 
 ### DB functions & triggers
 
@@ -486,6 +490,44 @@ Known **operational limitations** (ADR 0008 D3) that must be addressed before th
 
 ---
 
+## 7. Known Limitations & Coverage Gaps
+
+Transparency is defensibility. Every regulated workflow in the platform calls out the following limits, and the AI Analysis card + generated PDFs carry the matching disclaimer. Analyst review remains required on every decision.
+
+### 7.1 Registry coverage is UK-only
+
+The registry provider (`src/lib/screening/registry.ts`) talks only to **UK Companies House**. Jurisdictions outside the UK have no registry lookup today. Consequences:
+
+- A counterparty incorporated outside the UK will return **zero registry hits** regardless of its real filing status. The investigation workspace's Registry badge shows "Not found" — which is literally true for Companies House and literally wrong for the counterparty's actual home jurisdiction.
+- A UK-incorporated company whose registration number maps to a **nominee-owned shell** can appear with no PSCs/officers. The registry provider flags this with `data.ownership_status = 'unavailable'` on its hit; the Screening tab shows an amber warning inside the Registry card, and the Overview tab shows a UBO coverage banner. A manual verification must precede any approve/reject decision on these records.
+- Phase B+ candidates: OpenCorporates (aggregates ~140 jurisdictions), state-specific registers (DE / SOS filings, SG ACRA, HK CR, EU-level eIDAS).
+
+### 7.2 Adverse media uses free feeds
+
+Media screening blends **GDELT** (CC-licensed) and **NewsAPI free tier**. Both are usable but have lower depth and recency than licensed enterprise databases (Dow Jones Factiva, LexisNexis, World-Check):
+
+- GDELT crawls public news but misses paywalled and vernacular outlets.
+- NewsAPI free tier has a 24-hour delay on most sources.
+- There is no language coverage guarantee outside English + a few European languages.
+
+AI post-processing (Ollama → OpenRouter) classifies articles for relevance but cannot invent source material that isn't in the feed. For high-risk subjects, the analyst is expected to run an independent search in a licensed tool before signing off.
+
+### 7.3 Transaction monitoring is deferred (ADR 0007)
+
+The platform intentionally does **not** monitor financial transactions. Feature 5 in the original requirement set covers this — see §6 and [adr/0007-lifecycle-scope.md](adr/0007-lifecycle-scope.md). Counterparty behaviour post-onboarding (unusual patterns, structuring, velocity spikes) is out of scope for this product and belongs to a dedicated transaction-monitoring system.
+
+### 7.4 Rate limiter + sanctions-list cache (pre-production)
+
+Per ADR 0008 D3: the in-memory sliding-window rate limiter and the live OFAC/EU/UN sanctions-list fetches on every run must be replaced with an Upstash Redis limiter and a 24-hour sanctions cache **before the first paying tenant**. These are tracked and not shipped.
+
+### 7.5 Other gaps carried from ADR 0008
+
+- Real-time push alerts are not yet implemented (polling today, Phase B+ via Supabase Realtime).
+- Sub-investigation UI is schema-ready but not surfaced.
+- Report approval workflow, hit review refinements, per-org risk-weight settings, and user-management UI are all staged for Phase B+.
+
+---
+
 ## Appendix A — Directory layout
 
 ```
@@ -494,7 +536,7 @@ src/
 │   ├── (auth)/               login, register, reset-password, actions.ts
 │   ├── (dashboard)/          dashboard, investigations, escalations, reviews,
 │   │                         reports, settings, alerts
-│   ├── api/                  35 route.ts handlers (see §4)
+│   ├── api/                  39 route.ts handlers (see §4)
 │   ├── layout.tsx
 │   ├── page.tsx              Root redirect to /dashboard (instant=false)
 │   └── middleware.ts         Session refresh
@@ -529,7 +571,7 @@ src/
 └── types/                    database.ts (generated), domain shims
 supabase/
 ├── config.toml               Local Supabase init (seed disabled; see 02-DATA-MODEL)
-└── migrations/               00001 … 00012
+└── migrations/               00001 … 00015
 docs/
 ├── 02-DATA-MODEL.md
 ├── 03-API-CONTRACT.md

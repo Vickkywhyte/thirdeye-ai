@@ -211,6 +211,19 @@ function RegistryHitCard({ hit }: { hit: ScreeningHit }) {
           View on Companies House →
         </a>
       )}
+      {hit.data.ownership_status === 'unavailable' && (
+        <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <p className="text-xs text-amber-300">
+            <span className="font-medium">
+              Warning: Ownership data unavailable.
+            </span>{' '}
+            Companies House returned no PSCs or officers for this company —
+            manual verification is required before relying on this record for
+            beneficial-ownership decisions.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

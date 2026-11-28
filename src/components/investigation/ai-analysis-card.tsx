@@ -313,6 +313,12 @@ export function AiAnalysisCard({
         )}
 
         {error && <p className="text-xs text-red-400">{error}</p>}
+
+        <p className="mt-2 border-t border-border pt-3 text-[11px] leading-relaxed text-muted-foreground/80">
+          This report relies on publicly available data (Companies House, OFAC,
+          EU, UN, OpenSanctions, GDELT). Data gaps may exist. Analyst review is
+          required.
+        </p>
       </CardContent>
     </Card>
   )

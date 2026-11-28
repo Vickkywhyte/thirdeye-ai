@@ -258,6 +258,16 @@ export const registryProvider: ScreeningProvider = {
           ? 95
           : 70
 
+      // Coverage transparency: Companies House can return a company with
+      // zero PSCs and zero officers (restricted filer, historic filing
+      // exemption, non-UK ownership via nominees). In that case the UBO
+      // chain is unknown — not "no UBOs". Flag it so the UI can surface
+      // the gap and gate downstream decisions on a manual verification.
+      const ownershipStatus: 'available' | 'unavailable' =
+        activePscs.length === 0 && activeOfficers.length === 0
+          ? 'unavailable'
+          : 'available'
+
       const hits: ScreeningHit[] = [
         {
           source: 'UK Companies House',
@@ -276,6 +286,7 @@ export const registryProvider: ScreeningProvider = {
             officerCount: activeOfficers.length,
             pscs: ownership.filter((o) => o.kind === 'psc'),
             officers: ownership.filter((o) => o.kind === 'officer'),
+            ownership_status: ownershipStatus,
           },
           sourceUrl: `https://find-and-update.company-information.service.gov.uk/company/${companyNumber}`,
         },

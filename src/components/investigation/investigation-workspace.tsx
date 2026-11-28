@@ -153,6 +153,17 @@ export function InvestigationWorkspace({
   const canScheduleReview = hasPermission(userRole, 'reviews:update')
   const [activeTab, setActiveTab] = useState('overview')
 
+  // Transparency flag (Audit Item E): the registry provider tags its hit
+  // with ownership_status='unavailable' when Companies House returns the
+  // company itself but no PSCs / officers. Surface the gap on the
+  // Overview tab so an analyst can't miss it before making a decision.
+  const registryResult = screeningResults.find((r) => r.type === 'registry')
+  const ownershipUnavailable = (registryResult?.screening_hits ?? []).some(
+    (h) =>
+      (h.data as { ownership_status?: string } | undefined)
+        ?.ownership_status === 'unavailable'
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -306,10 +317,29 @@ export function InvestigationWorkspace({
               </CardContent>
             </Card>
 
-            <AiAnalysisCard
-              investigationId={investigation.id}
-              hasScreeningResults={screeningResults.length > 0}
-            />
+            <div className="space-y-4">
+              {ownershipUnavailable && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                  <div className="text-sm">
+                    <p className="font-medium text-amber-300">
+                      UBO coverage gap
+                    </p>
+                    <p className="mt-0.5 text-xs text-amber-300/80">
+                      Companies House returned no PSCs or officers for this
+                      counterparty. Beneficial ownership is{' '}
+                      <span className="font-medium">unverified</span> — treat
+                      the ownership graph as incomplete and complete a manual
+                      verification before approving.
+                    </p>
+                  </div>
+                </div>
+              )}
+              <AiAnalysisCard
+                investigationId={investigation.id}
+                hasScreeningResults={screeningResults.length > 0}
+              />
+            </div>
           </div>
         </TabsContent>
 
